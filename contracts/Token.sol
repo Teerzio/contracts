@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Unlicensed (C)
+
 pragma solidity ^0.8.19;
 
 abstract contract Context {
@@ -12,6 +13,43 @@ abstract contract Context {
 
     function _contextSuffixLength() internal view virtual returns (uint256) {
         return 0;
+    }
+}
+contract Ownable is Context {
+    address private _owner;
+
+    error OwnableUnauthorizedAccount(address account);
+    error OwnableInvalidOwner(address owner);
+
+    constructor () {
+        address msgSender = _msgSender();
+        _owner = msgSender;
+        emit OwnershipTransferred(address(0), msgSender);
+    }
+
+    function owner() public view returns (address) {
+        return _owner;
+    }
+
+    modifier onlyOwner() {
+        _checkOwner();
+        _;
+    }
+
+    function _checkOwner() internal view virtual {
+        if (_owner != _msgSender()) revert OwnableUnauthorizedAccount(_msgSender());
+    }
+
+    function renounceOwnership() public virtual onlyOwner {
+        emit OwnershipTransferred(_owner, address(0));
+        _owner = address(0);
+    }
+    
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        if (newOwner == address(0)) revert OwnableInvalidOwner(address(0));
+        emit OwnershipTransferred(_owner, newOwner);
+        _owner = newOwner;
     }
 }
 
@@ -413,25 +451,47 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
     ) external;
 }
 
+interface IEventHandler {
+        function emitCreationEvent(address owner, address tokenAddress, string memory name, string memory symbol, string memory description) external;
+        function emitBuyEvent(address buyer, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance) external;
+        function emitSellEvent(address seller, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance) external;
+        function emitLaunchedOnUniswap(address tokenAddress, address pairAddress) external;
+        function updateCallers(address newCaller) external;
+}
 
-contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard {
+interface IModulusToken {
+    
+    function buy(uint256 buyAmount) external payable;
+    function sell(uint256 tokenAmount) external payable;
+}
+
+contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard, Ownable {
+    
+    
     mapping(address account => uint256) private _balances;
-
     mapping(address account => mapping(address spender => uint256)) private _allowances;
 
     uint256 private _totalSupply;
 
     string private _name;
     string private _symbol;
+    string private _description;
     
     uint256 marketCap;
+    uint256 tokenPrice;
     uint256 private a;
     uint256 private b;
+
+    bool isLaunched;
+
+    address eventHandler;
 
     address wethUsdPair = 0x57b85FEf094e10b5eeCDF350Af688299E9553378;
     IUniswapV2Pair _IUniswapV2Pair = IUniswapV2Pair(0x57b85FEf094e10b5eeCDF350Af688299E9553378);
     IUniswapV2Factory _IUniswapV2Factory = IUniswapV2Factory(0xc35DADB65012eC5796536bD9864eD8773aBc74C4);
     IUniswapV2Router02 _IUniswapV2Router = IUniswapV2Router02(0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506);
+    IEventHandler _IEventHandler = IEventHandler(eventHandler);
+
 
     /**
      * @dev Sets the values for {name} and {symbol}.
@@ -439,9 +499,11 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(string memory name_, string memory symbol_, uint256 _a, uint256 _b) {
+    constructor(address _eventHandler, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b) {
+        eventHandler = _eventHandler;
         _name = name_;
         _symbol = symbol_;
+        _description = description_;
         a = _a;
         b = _b;
     }
@@ -709,9 +771,9 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
         }
     }
 
-    function buy () external payable nonReentrant{
+    function buy (uint256 buyAmount) external payable nonReentrant{
         //checks
-        if(msg.value > address(msg.sender).balance) {revert ERC20InsufficientBalance(msg.sender, address(msg.sender).balance, msg.value);}
+        if(buyAmount > address(msg.sender).balance) {revert ERC20InsufficientBalance(msg.sender, address(msg.sender).balance, msg.value);}
 
         //effects
         uint256 tokenAmount = calcTokenAmount(msg.value);
@@ -720,23 +782,52 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
         (uint112 reserve0, uint112 reserve1, ) = _IUniswapV2Pair.getReserves();
         uint256 pricePerETH = (reserve1 * 1e12) / reserve0; //USDC only has 6 decimals
 
-
-
         _mint(msg.sender, tokenAmount);
         uint256 pricePerToken = calcLastTokenPrice(_totalSupply);
         marketCap = pricePerToken * pricePerETH;
+        tokenPrice = pricePerToken;
+        
         transfer(address(this), msg.value);
 
-        if (marketCap > 30000 * 1e18 && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)) {
-           launchOnUniswap();
+        if (marketCap > 30000 * 1e18 && !isLaunched && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)) {
+            launchOnUniswap();
         }
+        
+        _IEventHandler.emitBuyEvent(msg.sender, address(this), tokenAmount, msg.value, marketCap, pricePerToken, address(this).balance);
+         
     }
 
-    function launchOnUniswap() internal {
+    function launchOnUniswap() internal{
         uint256 amountETHToLiq = address(this).balance / 3;
         uint256 amountTokensToLiq = calcTokenAmount(amountETHToLiq);
+        _mint(address(this), amountTokensToLiq);
+        address pair = _IUniswapV2Factory.createPair(address(this), _IUniswapV2Router.WETH());
         _IUniswapV2Router.addLiquidityETH(address(this), amountTokensToLiq, amountTokensToLiq, amountETHToLiq, address(0), block.timestamp);
+        isLaunched = true;
+
+        _IEventHandler.emitLaunchedOnUniswap(address(this), pair);
+
     }
+
+    function sell(uint256 tokenAmount) external payable nonReentrant{
+        if (tokenAmount > balanceOf(msg.sender)) {revert ERC20InsufficientBalance(msg.sender, balanceOf(msg.sender), tokenAmount);}
+        uint256 amountETH = calcETHamount(tokenAmount);
+        if (amountETH > address(this).balance) {revert ERC20InsufficientBalance(address(this), address(this).balance, amountETH);}
+
+        _burn(msg.sender, tokenAmount);
+
+        (uint112 reserve0, uint112 reserve1, ) = _IUniswapV2Pair.getReserves();
+        uint256 pricePerETH = (reserve1 * 1e12) / reserve0; //USDC only has 6 decimals
+        uint256 pricePerToken = calcLastTokenPrice(_totalSupply);
+        marketCap = pricePerToken * pricePerETH;
+        tokenPrice = pricePerToken;
+
+        (bool sent, ) = payable(msg.sender).call{value: amountETH}("");
+        require(sent, "Failed to send Ether");
+
+        _IEventHandler.emitSellEvent(msg.sender, address(this), tokenAmount, amountETH, marketCap, pricePerToken, address(this).balance);
+
+    }   
 
     function calcTokenAmount (uint256 buyAmountETH) internal view returns (uint256 tokenAmount){
         uint256 tokensToMint = 0;
@@ -749,6 +840,18 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
            tokensToMint++;
         }
         return tokensToMint;
+    }
+
+    function calcETHamount(uint256 sellAmountToken)internal view returns (uint256) {
+        uint256 ETHToSend = 0;
+        uint256 currentSupply = _totalSupply;
+
+        for (uint256 i = 0; i < sellAmountToken ; i++) {
+            uint256 currentTokenPrice = a * pow(b, currentSupply - 1) / 1 ether;
+            ETHToSend += currentTokenPrice;
+            currentSupply--;
+        }
+        return ETHToSend;
     }
 
     // Exponentiation function using fixed-point multiplication
@@ -768,8 +871,6 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
     function calcLastTokenPrice(uint256 supply) public view returns (uint256) {
         return a * pow(b, supply) / 1 ether;
     }
-
-
 
     receive () external payable {}
     fallback () external payable {}
