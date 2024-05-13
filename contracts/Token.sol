@@ -481,6 +481,8 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
     uint256 tokenPrice;
     uint256 private a;
     uint256 private b;
+    uint256 public raised;
+    uint256 public goal;
 
     bool isLaunched;
 
@@ -499,13 +501,15 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(address _eventHandler, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b) {
+    constructor(address _eventHandler, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b, uint256 _goal, uint256 _raised) {
         eventHandler = _eventHandler;
         _name = name_;
         _symbol = symbol_;
         _description = description_;
         a = _a;
         b = _b;
+        goal = _goal;
+        raised = _raised;
     }
 
     /**
@@ -771,12 +775,11 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
         }
     }
 
-    function buy (uint256 buyAmount) external payable nonReentrant{
+    function buy (uint256 minimumTokens) external payable nonReentrant{
         //checks
-        if(buyAmount > address(msg.sender).balance) {revert ERC20InsufficientBalance(msg.sender, address(msg.sender).balance, msg.value);}
-
-        //effects
         uint256 tokenAmount = calcTokenAmount(msg.value);
+
+        require(minimumTokens >= tokenAmount, "insufficient output amount");
 
         //reserve0 = WETH, reserve1 = USDC
         (uint112 reserve0, uint112 reserve1, ) = _IUniswapV2Pair.getReserves();
@@ -787,9 +790,10 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
         marketCap = pricePerToken * pricePerETH;
         tokenPrice = pricePerToken;
         
+        raised += msg.value;
         transfer(address(this), msg.value);
 
-        if (marketCap > 30000 * 1e18 && !isLaunched && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)) {
+        if (raised > goal && !isLaunched && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)) {
             launchOnUniswap();
         }
         
@@ -798,7 +802,7 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
     }
 
     function launchOnUniswap() internal{
-        uint256 amountETHToLiq = address(this).balance / 3;
+        uint256 amountETHToLiq = address(this).balance / 4;
         uint256 amountTokensToLiq = calcTokenAmount(amountETHToLiq);
         _mint(address(this), amountTokensToLiq);
         address pair = _IUniswapV2Factory.createPair(address(this), _IUniswapV2Router.WETH());
@@ -809,10 +813,11 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
 
     }
 
-    function sell(uint256 tokenAmount) external payable nonReentrant{
+    function sell(uint256 tokenAmount, uint256 minETHAmount) external payable nonReentrant{
         if (tokenAmount > balanceOf(msg.sender)) {revert ERC20InsufficientBalance(msg.sender, balanceOf(msg.sender), tokenAmount);}
         uint256 amountETH = calcETHamount(tokenAmount);
         if (amountETH > address(this).balance) {revert ERC20InsufficientBalance(address(this), address(this).balance, amountETH);}
+        require (minETHAmount >= amountETH, "insufficient output amount");
 
         _burn(msg.sender, tokenAmount);
 
@@ -834,8 +839,8 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
         uint256 currentSupply = _totalSupply;
         uint256 remainingETH = buyAmountETH;
 
-        while (buyAmountETH >= a * (2 ** ((currentSupply) * b / 1 ether))){
-           remainingETH -= a * (2 ** ((currentSupply) * b / 1 ether));
+        while (buyAmountETH >= a + (currentSupply * b )){
+           remainingETH -= a + (currentSupply * b);
            currentSupply++;
            tokensToMint++;
         }
@@ -847,7 +852,7 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
         uint256 currentSupply = _totalSupply;
 
         for (uint256 i = 0; i < sellAmountToken ; i++) {
-            uint256 currentTokenPrice = a * pow(b, currentSupply - 1) / 1 ether;
+            uint256 currentTokenPrice = a + (currentSupply * b);
             ETHToSend += currentTokenPrice;
             currentSupply--;
         }
@@ -869,7 +874,7 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
  
     // Function to calculate the price of the last minted token
     function calcLastTokenPrice(uint256 supply) public view returns (uint256) {
-        return a * pow(b, supply) / 1 ether;
+        return a + (supply * b);
     }
 
     receive () external payable {}
