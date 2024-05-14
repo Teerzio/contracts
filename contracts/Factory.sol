@@ -30,7 +30,7 @@ contract Factory is Ownable{
     error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed);
 
 
-    function deployNewToken(uint256 buyAmount, address _eventHandler, string memory name_, string memory symbol_, string memory description_) external payable returns (address token){
+    function deployNewToken(uint256 buyAmount, address _eventHandler, string memory name_, string memory symbol_, string memory description_, uint256 goal) external payable returns (address token){
         if(!active) {revert ("contract is not active yet");}
         if(buyAmount + fee > msg.value) {revert ERC20InsufficientBalance(_msgSender(), _msgSender().balance, buyAmount + fee);}
         if(buyAmount + fee > _msgSender().balance) {revert ERC20InsufficientBalance(_msgSender(), _msgSender().balance, buyAmount + fee);}
@@ -41,7 +41,8 @@ contract Factory is Ownable{
             symbol_,
             description_,
             _a,
-            _b
+            _b,
+            goal
         ));
 
         deployedTokens.push(address(token));
@@ -57,6 +58,7 @@ contract Factory is Ownable{
 
         Ownership(token).renounceOwnership();
 
+        IEventHandler(eventHandler).emitCreationEvent(_msgSender(), address(token), name_, symbol_, description_, goal);
     }
 
     function changeOwner() external {
@@ -72,6 +74,16 @@ contract Factory is Ownable{
     function setActive() external {
         require(_msgSender() == owner, "only the owner can call this function");
         active = true;
+    }
+
+    function setA (uint256 a) external {
+        require(_msgSender() == owner, "only the owner can call this function");
+        _a = a;
+    }
+
+    function setB (uint256 b) external {
+        require(_msgSender() == owner, "only the owner can call this function");
+        _b = b;
     }
 
 

@@ -501,7 +501,7 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(address _eventHandler, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b, uint256 _goal, uint256 _raised) {
+    constructor(address _eventHandler, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b, uint256 _goal) {
         eventHandler = _eventHandler;
         _name = name_;
         _symbol = symbol_;
@@ -509,7 +509,6 @@ contract ModulusToken is Context, IERC20, IERC20Metadata, IERC20Errors, Reentran
         a = _a;
         b = _b;
         goal = _goal;
-        raised = _raised;
     }
 
     /**

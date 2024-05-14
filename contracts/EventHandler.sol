@@ -15,15 +15,15 @@ contract EventHandler {
         callers[_factory] = true;
     }
 
-    event Created(address owner, address tokenAddress, string name, string symbol, string description, uint256 timestamp);
+    event Created(address owner, address tokenAddress, string name, string symbol, string description, uint256 goal, uint256 timestamp);
     event Bought(address buyer, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance, uint256 timestamp);
     event Sold(address seller, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance, uint256 timestamp);
     event LaunchedOnUniswap(address tokenAddress, address pairAddress, uint256 timestamp);
 
-    function emitCreationEvent(address owner, address tokenAddress, string memory name, string memory symbol, string memory description) external {
+    function emitCreationEvent(address owner, address tokenAddress, string memory name, string memory symbol, string memory description, uint256 goal) external {
         require(callers[msg.sender], "you are not allowed to call this function");
 
-        emit Created(owner, tokenAddress, name, symbol, description, block.timestamp);
+        emit Created(owner, tokenAddress, name, symbol, description, goal, block.timestamp);
     }
 
     function emitBuyEvent(address buyer, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance) external {
