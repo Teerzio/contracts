@@ -10,20 +10,20 @@ interface Ownership {
     function renounceOwnership() external;
 }
 
-contract Factory is Ownable{
+contract Factory {
 
-    address eventHandler;
+    address public eventHandler;
     address [] public deployedTokens;
-    address owner;
+    address public owner;
     bool active;
-    uint256 fee;
+    uint256 public fee;
 
     //bonding curve params forwarded to token
-    uint256 _a;
-    uint256 _b;
+    uint256 public _a;
+    uint256 public _b;
 
     constructor (uint256 fee_) {
-        owner = _msgSender();
+        owner = msg.sender;
         fee = fee_;
     }
 
@@ -32,8 +32,8 @@ contract Factory is Ownable{
 
     function deployNewToken(uint256 buyAmount, address _eventHandler, string memory name_, string memory symbol_, string memory description_, uint256 goal) external payable returns (address token){
         if(!active) {revert ("contract is not active yet");}
-        if(buyAmount + fee > msg.value) {revert ERC20InsufficientBalance(_msgSender(), _msgSender().balance, buyAmount + fee);}
-        if(buyAmount + fee > _msgSender().balance) {revert ERC20InsufficientBalance(_msgSender(), _msgSender().balance, buyAmount + fee);}
+        if(buyAmount + fee > msg.value) {revert ERC20InsufficientBalance(msg.sender, msg.sender.balance, buyAmount + fee);}
+        if(buyAmount + fee > msg.sender.balance) {revert ERC20InsufficientBalance(msg.sender, msg.sender.balance, buyAmount + fee);}
 
         token = address (new ModulusToken(
             _eventHandler,
@@ -50,7 +50,7 @@ contract Factory is Ownable{
 
         if(buyAmount > 0){
             IModulusToken(token).buy(buyAmount);
-            IERC20(token).transfer(_msgSender(), buyAmount);
+            IERC20(token).transfer(msg.sender, buyAmount);
         }
 
         (bool sentFee, ) = payable(owner).call{value: fee}("");
@@ -58,31 +58,31 @@ contract Factory is Ownable{
 
         Ownership(token).renounceOwnership();
 
-        IEventHandler(eventHandler).emitCreationEvent(_msgSender(), address(token), name_, symbol_, description_, goal);
+        IEventHandler(eventHandler).emitCreationEvent(msg.sender, address(token), name_, symbol_, description_, goal);
     }
 
     function changeOwner() external {
-        require(_msgSender() == owner, "only the owner can call this function");
-        owner = _msgSender();
+        require(msg.sender == owner, "only the owner can call this function");
+        owner = msg.sender;
     }
 
     function setEventHandler(address eventHandler_) external {
-        require(_msgSender() == owner, "only the owner can call this function");
+        require(msg.sender == owner, "only the owner can call this function");
         eventHandler = eventHandler_;
     }
 
     function setActive() external {
-        require(_msgSender() == owner, "only the owner can call this function");
+        require(msg.sender == owner, "only the owner can call this function");
         active = true;
     }
 
     function setA (uint256 a) external {
-        require(_msgSender() == owner, "only the owner can call this function");
+        require(msg.sender == owner, "only the owner can call this function");
         _a = a;
     }
 
     function setB (uint256 b) external {
-        require(_msgSender() == owner, "only the owner can call this function");
+        require(msg.sender == owner, "only the owner can call this function");
         _b = b;
     }
 

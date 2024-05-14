@@ -452,7 +452,7 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
 }
 
 interface IEventHandler {
-        function emitCreationEvent(address owner, address tokenAddress, string memory name, string memory symbol, string memory description) external;
+        function emitCreationEvent(address owner, address tokenAddress, string memory name, string memory symbol, string memory description, uint256 goal) external;
         function emitBuyEvent(address buyer, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance) external;
         function emitSellEvent(address seller, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance) external;
         function emitLaunchedOnUniswap(address tokenAddress, address pairAddress) external;
