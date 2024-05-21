@@ -74,9 +74,89 @@ const {
         const raise = ethers.utils.parseUnits("1", "ether"); // This equals 10 ** 17 wei
         const txValue = raise.add(initialFee)
         const active = await ownerConnect.setActive();
-        const token = await tokenCreatorConnect.deployNewToken(0, eventHandler.address, "Token", "TKN", "description", raise, {value: txValue.toString()});
-        console.log("token address", token.address)
+        const txResponse = await tokenCreatorConnect.deployNewToken(eventHandler.address, "Token", "TKN", "description", raise, {value: txValue.toString()});
+        const receipt = await txResponse.wait();
+
+        const eventFilter = eventHandler.filters.Created();
+        const events = await eventHandler.queryFilter(eventFilter, receipt.blockNumber, receipt.blockNumber);
+
+        if (events.length > 0) {
+          const tokenAddress = events[0].args.tokenAddress; // Adjust based on how your event arguments are structured
+          console.log("Token address:", tokenAddress);
+      } else {
+          console.error("No CreationEvent found");
+      }
       });
+     /* it("Should create a Token successfully and buy supply", async function(){
+        const { factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
+        const raise = ethers.utils.parseUnits("1", "ether"); // This equals 10 ** 17 wei
+        const buyAmount = ethers.utils.parseUnits("0.1", "ether"); // This equals 10 ** 17 wei
+        const txValue = buyAmount.add(initialFee)
+        const active = await ownerConnect.setActive();
+        const txResponse = await tokenCreatorConnect.deployNewToken(100, eventHandler.address, "Token", "TKN", "description", raise, {value: txValue.toString()});
+        const receipt = await txResponse.wait();
+
+        const eventFilter = eventHandler.filters.Created();
+        const events = await eventHandler.queryFilter(eventFilter, receipt.blockNumber, receipt.blockNumber);
+
+        if (events.length > 0) {
+          const tokenAddress = events[0].args.tokenAddress; // Adjust based on how your event arguments are structured
+          console.log("Token address:", tokenAddress);
+      } else {
+          console.error("No Creation Event found");
+      }
+
+      });*/
     });
+    it("should send the fee to the owner", async function (){
+      const { factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
+      const active = await ownerConnect.setActive();
+      const ownerBalanceBefore = await ethers.provider.getBalance(factoryOwner.address);
+      const txResponse = await tokenCreatorConnect.deployNewToken(eventHandler.address, "Token", "TKN", "description", 100, {value: initialFee.toString()});
+      const ownerBalanceAfter = ownerBalanceBefore.add(initialFee)
+      const fetchOwnerBalanceAfter = await ethers.provider.getBalance(factoryOwner.address)
+      expect(fetchOwnerBalanceAfter).to.equal(ownerBalanceAfter)
+      console.log("ownerBalanceBefore", ownerBalanceBefore)
+      console.log("ownerBalanceAfterCalc", ownerBalanceAfter)
+      console.log("ownerBalanceAfterFetch", await ethers.provider.getBalance(factoryOwner.address))
+      console.log("transferredFee", ethers.utils.formatUnits((fetchOwnerBalanceAfter.sub(ownerBalanceBefore)).toString()))
+    })
+    
+
+    describe("Initial Parameters", function(){
+      it("should set the owner to the message sender", async function(){
+        const {factoryOwner, factory} = await loadFixture(fixture);
+        const ownerVar = await factory.owner()
+        expect(factoryOwner.address).to.equal(ownerVar)
+      })
+      it("should set the new Token as a valid caller of the EventHandler", async function(){
+        const { factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
+        const raise = ethers.utils.parseUnits("1", "ether"); // This equals 10 ** 17 wei
+        const txValue = raise.add(initialFee)
+
+        const active = await ownerConnect.setActive();
+        const txResponse = await tokenCreatorConnect.deployNewToken(eventHandler.address, "Token", "TKN", "description", raise, {value: txValue.toString()});
+        const receipt = await txResponse.wait();
+
+        const eventFilter = eventHandler.filters.Created();
+        const events = await eventHandler.queryFilter(eventFilter, receipt.blockNumber, receipt.blockNumber);
+
+        if (events.length > 0) {
+          const tokenAddress = events[0].args.tokenAddress; // Adjust based on how your event arguments are structured
+          console.log("Token address:", tokenAddress);
+          const validCaller = await eventHandler.callers(tokenAddress)
+          expect(validCaller).to.equal(true)
+      } else {
+          console.error("No CreationEvent found");
+      }
+      })
+      it("should enforce owner restrictions accordingly", async function(){
+        const { factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
+        await expect(tokenCreatorConnect.changeOwner("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")).to.be.revertedWith("only the owner can call this function")
+        await expect(tokenCreatorConnect.setActive()).to.be.revertedWith("only the owner can call this function")
+        await expect(tokenCreatorConnect.setA(ethers.utils.parseUnits("0.000001", "ether"))).to.be.revertedWith("only the owner can call this function")
+        await expect(tokenCreatorConnect.setB(ethers.utils.parseUnits("0.000001", "ether"))).to.be.revertedWith("only the owner can call this function")
+      })
+    }) 
   })
 

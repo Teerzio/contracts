@@ -30,12 +30,12 @@ contract Factory {
     error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed);
 
 
-    function deployNewToken(uint256 buyAmount, address _eventHandler, string memory name_, string memory symbol_, string memory description_, uint256 goal) external payable returns (address token){
+    function deployNewToken(address _eventHandler, string memory name_, string memory symbol_, string memory description_, uint256 goal) external payable returns (address token){
         if(!active) {revert ("contract is not active yet");}
-        if(buyAmount + fee > msg.value) {revert ERC20InsufficientBalance(msg.sender, msg.sender.balance, buyAmount + fee);}
-        if(buyAmount + fee > msg.sender.balance) {revert ERC20InsufficientBalance(msg.sender, msg.sender.balance, buyAmount + fee);}
+        if(fee > msg.value) {revert ERC20InsufficientBalance(msg.sender, msg.sender.balance, fee);}
+        if(fee > msg.sender.balance) {revert ERC20InsufficientBalance(msg.sender, msg.sender.balance, fee);}
 
-        token = address (new ModulusToken(
+        token = address (new Token(
             _eventHandler,
             name_,
             symbol_,
@@ -48,10 +48,12 @@ contract Factory {
         deployedTokens.push(address(token));
         IEventHandler(eventHandler).updateCallers(address(token));
 
-        if(buyAmount > 0){
-            IModulusToken(token).buy(buyAmount);
+       /* 
+       if(buyAmount > 0){
+            IModulusToken(token).buy{value: buyAmount}(buyAmount);
             IERC20(token).transfer(msg.sender, buyAmount);
-        }
+        } 
+        */
 
         (bool sentFee, ) = payable(owner).call{value: fee}("");
         require(sentFee, "Failed to send Ether");
@@ -61,9 +63,9 @@ contract Factory {
         IEventHandler(eventHandler).emitCreationEvent(msg.sender, address(token), name_, symbol_, description_, goal);
     }
 
-    function changeOwner() external {
+    function changeOwner(address _owner) external {
         require(msg.sender == owner, "only the owner can call this function");
-        owner = msg.sender;
+        owner = _owner;
     }
 
     function setEventHandler(address eventHandler_) external {
