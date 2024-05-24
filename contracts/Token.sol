@@ -455,7 +455,7 @@ interface IEventHandler {
         function emitCreationEvent(address owner, address tokenAddress, string memory name, string memory symbol, string memory description, uint256 goal) external;
         function emitBuyEvent(address buyer, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance) external;
         function emitSellEvent(address seller, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance) external;
-        function emitLaunchedOnUniswap(address tokenAddress, address pairAddress) external;
+        function emitLaunchedOnUniswap(address tokenAddress, address pairAddress, uint256 amountETHToLiq, uint256 amountTokensToLiq) external;
         function updateCallers(address newCaller) external;
 }
 
@@ -468,30 +468,27 @@ interface IModulusToken {
 contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard, Ownable {
     
     
-    mapping(address account => uint256) private _balances;
+    mapping(address account => uint256) public _balances;
     mapping(address account => mapping(address spender => uint256)) private _allowances;
 
-    uint256 private _totalSupply;
+    uint256 public _totalSupply;
 
     string private _name;
     string private _symbol;
     string private _description;
     
-    uint256 marketCap;
-    uint256 tokenPrice;
+    uint256 public marketCap;
+    uint256 public tokenPrice;
     uint256 private a;
     uint256 private b;
     uint256 public raised;
     uint256 public goal;
 
-    bool isLaunched;
+    bool public isLaunched;
 
-    address public eventHandler;
-
-    address wethUsdPair = 0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc;
-    IUniswapV2Pair _IUniswapV2Pair = IUniswapV2Pair(0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc);
-    IUniswapV2Factory _IUniswapV2Factory = IUniswapV2Factory(0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f);
-    IUniswapV2Router02 _IUniswapV2Router = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+    IUniswapV2Pair public _IUniswapV2Pair;
+    IUniswapV2Factory public _IUniswapV2Factory;
+    IUniswapV2Router02 public _IUniswapV2Router;
     IEventHandler public _IEventHandler;
 
 
@@ -501,9 +498,11 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(address _eventHandler, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b, uint256 _goal) {
-        eventHandler = _eventHandler;
-        _IEventHandler = IEventHandler(_eventHandler);
+    constructor(address [] memory params, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b, uint256 _goal) {
+        _IEventHandler = IEventHandler(params[0]);
+        _IUniswapV2Pair = IUniswapV2Pair(params[1]);
+        _IUniswapV2Factory = IUniswapV2Factory(params[2]);
+        _IUniswapV2Router = IUniswapV2Router02(params[3]);
         _name = name_;
         _symbol = symbol_;
         _description = description_;
@@ -787,7 +786,7 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
 
         _mint(msg.sender, tokenAmount);
         uint256 pricePerToken = calcLastTokenPrice(_totalSupply);
-        marketCap = pricePerToken * _totalSupply;
+        marketCap = pricePerToken * _totalSupply * pricePerETH;
         tokenPrice = pricePerToken;
         
         raised += msg.value;
@@ -795,7 +794,7 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         require(sendETH, "Failed to send Ether");
 
 
-        if (raised > goal && !isLaunched && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)) {
+        if (!isLaunched && raised >= goal && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)) {
             launchOnUniswap();
         }
         
@@ -803,15 +802,20 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
          
     }
 
+    event LogUints (uint256 amountETHToLiq, uint256 amountTokensToLiq);
     function launchOnUniswap() internal{
         uint256 amountETHToLiq = address(this).balance / 4;
         uint256 amountTokensToLiq = calcTokenAmount(amountETHToLiq);
+        emit LogUints(amountETHToLiq, amountTokensToLiq);
+
         _mint(address(this), amountTokensToLiq);
+        _approve(address(this), address(_IUniswapV2Router), amountTokensToLiq);
+
         address pair = _IUniswapV2Factory.createPair(address(this), _IUniswapV2Router.WETH());
-        _IUniswapV2Router.addLiquidityETH(address(this), amountTokensToLiq, amountTokensToLiq, amountETHToLiq, address(0), block.timestamp);
+        _IUniswapV2Router.addLiquidityETH{value: amountETHToLiq}(address(this), amountTokensToLiq, amountTokensToLiq, amountETHToLiq, address(0), block.timestamp);
         isLaunched = true;
 
-        _IEventHandler.emitLaunchedOnUniswap(address(this), pair);
+        _IEventHandler.emitLaunchedOnUniswap(address(this), pair, amountETHToLiq, amountTokensToLiq);
 
     }
 
@@ -819,17 +823,17 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         if (tokenAmount > balanceOf(msg.sender)) {revert ERC20InsufficientBalance(msg.sender, balanceOf(msg.sender), tokenAmount);}
         uint256 amountETH = calcETHamount(tokenAmount);
         if (amountETH > address(this).balance) {revert ERC20InsufficientBalance(address(this), address(this).balance, amountETH);}
-        require (minETHAmount >= amountETH, "insufficient output amount");
+        require (amountETH  >= minETHAmount, "insufficient output amount");
 
         _burn(msg.sender, tokenAmount);
 
         (uint112 reserve0, uint112 reserve1, ) = _IUniswapV2Pair.getReserves();
-        uint256 pricePerETH = (reserve1 * 1e12) / reserve0; //USDC only has 6 decimals
+        uint256 pricePerETH = (reserve0 * 1e12) / reserve1; //USDC only has 6 decimals
         uint256 pricePerToken = calcLastTokenPrice(_totalSupply);
-        marketCap = pricePerToken * pricePerETH;
+        marketCap = pricePerToken * _totalSupply * pricePerETH;
         tokenPrice = pricePerToken;
 
-        (bool sent, ) = payable(msg.sender).call{value: amountETH}("");
+        (bool sent, ) = payable(_msgSender()).call{value: amountETH}("");
         require(sent, "Failed to send Ether");
 
         _IEventHandler.emitSellEvent(msg.sender, address(this), tokenAmount, amountETH, marketCap, pricePerToken, address(this).balance);

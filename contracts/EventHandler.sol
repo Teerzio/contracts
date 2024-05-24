@@ -18,7 +18,7 @@ contract EventHandler {
     event Created(address owner, address tokenAddress, string name, string symbol, string description, uint256 goal, uint256 timestamp);
     event Bought(address buyer, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance, uint256 timestamp);
     event Sold(address seller, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance, uint256 timestamp);
-    event LaunchedOnUniswap(address tokenAddress, address pairAddress, uint256 timestamp);
+    event LaunchedOnUniswap(address tokenAddress, address pairAddress, uint256 amountETHToLiq, uint256 amountTokensToLiq, uint256 timestamp);
 
     function emitCreationEvent(address owner, address tokenAddress, string memory name, string memory symbol, string memory description, uint256 goal) external {
         require(callers[msg.sender], "you are not allowed to call this function");
@@ -38,10 +38,10 @@ contract EventHandler {
         emit Sold(seller, tokenAddress, amountToken, amountETH, marketCap, tokenPrice, contractETHBalance, block.timestamp);
     }
 
-    function emitLaunchedOnUniswap(address tokenAddress, address pairAddress) external {
+    function emitLaunchedOnUniswap(address tokenAddress, address pairAddress, uint256 amountETHToLiq, uint256 amountTokensToLiq ) external {
         require(callers[msg.sender], "you are not allowed to call this function");
 
-        emit LaunchedOnUniswap(tokenAddress, pairAddress, block.timestamp);
+        emit LaunchedOnUniswap(tokenAddress, pairAddress, amountETHToLiq, amountTokensToLiq, block.timestamp);
     }
 
     function updateCallers(address newCaller) external {

@@ -25,8 +25,13 @@ module.exports = {
         count: 30
       }
     },
+    base: {
+      url: process.env.BASE_ENDPOINT,
+      accounts: [process.env.PRIVATE_KEY],
+    },
+    
   },
   gasReporter: {
-    enabled: false
+    enabled: true
   }
 }
