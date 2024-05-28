@@ -29,6 +29,14 @@ module.exports = {
       url: process.env.BASE_ENDPOINT,
       accounts: [process.env.PRIVATE_KEY],
     },
+    sepolia: {
+      url: process.env.SEPOLIA_ENDPOINT,
+      accounts: [process.env.PRIVATE_KEY]
+    },
+    bsc_testnet:{
+      url: "https://bsc-testnet.bnbchain.org/",
+      accounts: [process.env.PRIVATE_KEY]
+    }
     
   },
   gasReporter: {

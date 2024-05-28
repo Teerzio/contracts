@@ -259,8 +259,6 @@ const {
 
 
 
-
-
             const eventFilter = eventHandler.filters.LaunchedOnUniswap()
             const events = await eventHandler.queryFilter(eventFilter, receipt.blockNumber, receipt.blockNumber)
             const tokenPrice = await randomBuyerConnect.tokenPrice()
