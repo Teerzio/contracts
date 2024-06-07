@@ -6,7 +6,7 @@ require('dotenv').config()
 
 module.exports = {
   solidity: {
-    version: "0.8.23",
+    version: "0.8.19",
     settings: {
       optimizer: {
         enabled: true,
@@ -34,7 +34,7 @@ module.exports = {
       accounts: [process.env.PRIVATE_KEY]
     },
     bsc_testnet:{
-      url: "https://bsc-testnet.bnbchain.org/",
+      url: "https://bsc-prebsc-dataseed.bnbchain.org",
       accounts: [process.env.PRIVATE_KEY]
     }
     

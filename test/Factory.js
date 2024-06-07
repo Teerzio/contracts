@@ -76,7 +76,7 @@ const {
         const raise = ethers.utils.parseUnits("1", "ether"); // This equals 10 ** 17 wei
         const txValue = raise.add(initialFee)
         const active = await ownerConnect.setActive();
-        const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", raise, {value: txValue.toString()});
+        const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", {value: initialFee.toString()});
         const receipt = await txResponse.wait();
 
         const eventFilter = eventHandler.filters.Created();
@@ -114,7 +114,7 @@ const {
       const { params, factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
       const active = await ownerConnect.setActive();
       const ownerBalanceBefore = await ethers.provider.getBalance(factoryOwner.address);
-      const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", 100, {value: initialFee.toString()});
+      const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", {value: initialFee.toString()});
       const ownerBalanceAfter = ownerBalanceBefore.add(initialFee)
       const fetchOwnerBalanceAfter = await ethers.provider.getBalance(factoryOwner.address)
       expect(fetchOwnerBalanceAfter).to.equal(ownerBalanceAfter)
@@ -133,11 +133,9 @@ const {
       })
       it("should set the new Token as a valid caller of the EventHandler", async function(){
         const { params, factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
-        const raise = ethers.utils.parseUnits("1", "ether"); // This equals 10 ** 17 wei
-        const txValue = raise.add(initialFee)
 
         const active = await ownerConnect.setActive();
-        const txResponse = await tokenCreatorConnect.deployNewToken(params , "Token", "TKN", "description", raise, {value: txValue.toString()});
+        const txResponse = await tokenCreatorConnect.deployNewToken(params , "Token", "TKN", "description", {value: initialFee.toString()});
         const receipt = await txResponse.wait();
 
         const eventFilter = eventHandler.filters.Created();

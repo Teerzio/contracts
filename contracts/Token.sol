@@ -452,9 +452,9 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
 }
 
 interface IEventHandler {
-        function emitCreationEvent(address owner, address tokenAddress, string memory name, string memory symbol, string memory description, uint256 goal) external;
-        function emitBuyEvent(address buyer, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance) external;
-        function emitSellEvent(address seller, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 marketCap, uint256 tokenPrice, uint256 contractETHBalance) external;
+        function emitCreationEvent(address owner, address tokenAddress, string memory name, string memory symbol, string memory description) external;
+        function emitBuyEvent(address buyer, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance) external;
+        function emitSellEvent(address seller, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance) external;
         function emitLaunchedOnUniswap(address tokenAddress, address pairAddress, uint256 amountETHToLiq, uint256 amountTokensToLiq) external;
         function updateCallers(address newCaller) external;
 }
@@ -471,7 +471,10 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
     mapping(address account => uint256) public _balances;
     mapping(address account => mapping(address spender => uint256)) private _allowances;
 
-    uint256 public _totalSupply;
+    uint256 public _totalSupply = 100_000_000 * 10 ** 18;
+    uint256 private scalingFactor = 100_000;
+    uint256 public immutable threshold = 25_000_000 * 10 **18;
+
 
     string private _name;
     string private _symbol;
@@ -482,7 +485,6 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
     uint256 private a;
     uint256 private b;
     uint256 public raised;
-    uint256 public goal;
 
     bool public isLaunched;
 
@@ -491,14 +493,15 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
     IUniswapV2Router02 public _IUniswapV2Router;
     IEventHandler public _IEventHandler;
 
-
+    error InsufficientOutputAmount();
+    error InsufficientContractBalance(uint256 contractTokenBalance, uint256 tokensRequested);
     /**
      * @dev Sets the values for {name} and {symbol}.
      *
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(address [] memory params, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b, uint256 _goal) {
+    constructor(address [] memory params, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b) {
         _IEventHandler = IEventHandler(params[0]);
         _IUniswapV2Pair = IUniswapV2Pair(params[1]);
         _IUniswapV2Factory = IUniswapV2Factory(params[2]);
@@ -508,7 +511,7 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         _description = description_;
         a = _a;
         b = _b;
-        goal = _goal;
+        _balances[address(this)] = 100_000_000 * 10 ** 18;
     }
 
     /**
@@ -777,28 +780,28 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
     function buy (uint256 minimumTokens) external payable nonReentrant{
         //checks
         uint256 tokenAmount = calcTokenAmount(msg.value);
-
-        require( tokenAmount >= minimumTokens, "insufficient output amount");
+        if(tokenAmount > _balances[address(this)]) {revert InsufficientContractBalance(_balances[address(this)], tokenAmount);}
+        if(tokenAmount < minimumTokens) {revert InsufficientOutputAmount();}
+        
 
         //reserve0 = WETH, reserve1 = USDC
-        (uint112 reserve0, uint112 reserve1, ) = _IUniswapV2Pair.getReserves();
-        uint256 pricePerETH = (reserve0 * 1e12) / reserve1; //USDC only has 6 decimals
+        //(uint112 reserve0, uint112 reserve1, ) = _IUniswapV2Pair.getReserves();
+        //uint256 pricePerETH = (reserve0 * 1e12) / reserve1; //USDC only has 6 decimals
 
-        _mint(msg.sender, tokenAmount);
-        uint256 pricePerToken = calcLastTokenPrice(_totalSupply);
-        marketCap = pricePerToken * _totalSupply * pricePerETH;
-        tokenPrice = pricePerToken;
+        transferFrom(address(this), msg.sender, tokenAmount);
+        //uint256 pricePerToken = calcLastTokenPrice(_totalSupply);
+        //marketCap = pricePerToken * _totalSupply * pricePerETH;
+        //tokenPrice = pricePerToken;
         
-        raised += msg.value;
         (bool sendETH, ) = payable(address(this)).call{value: msg.value}("");
         require(sendETH, "Failed to send Ether");
 
 
-        if (!isLaunched && raised >= goal && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)) {
+        if (!isLaunched && _balances[address(this)] < threshold && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)) {
             launchOnUniswap();
         }
         
-        _IEventHandler.emitBuyEvent(msg.sender, address(this), tokenAmount, msg.value, marketCap, pricePerToken, address(this).balance);
+        _IEventHandler.emitBuyEvent(msg.sender, address(this), tokenAmount, msg.value, _balances[address(this)], address(this).balance);
          
     }
 
@@ -808,7 +811,6 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         uint256 amountTokensToLiq = calcTokenAmount(amountETHToLiq);
         emit LogUints(amountETHToLiq, amountTokensToLiq);
 
-        _mint(address(this), amountTokensToLiq);
         _approve(address(this), address(_IUniswapV2Router), amountTokensToLiq);
 
         address pair = _IUniswapV2Factory.createPair(address(this), _IUniswapV2Router.WETH());
@@ -825,24 +827,23 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         if (amountETH > address(this).balance) {revert ERC20InsufficientBalance(address(this), address(this).balance, amountETH);}
         require (amountETH  >= minETHAmount, "insufficient output amount");
 
-        _burn(msg.sender, tokenAmount);
+        transferFrom(msg.sender, address(this), tokenAmount);
 
-        (uint112 reserve0, uint112 reserve1, ) = _IUniswapV2Pair.getReserves();
-        uint256 pricePerETH = (reserve0 * 1e12) / reserve1; //USDC only has 6 decimals
-        uint256 pricePerToken = calcLastTokenPrice(_totalSupply);
-        marketCap = pricePerToken * _totalSupply * pricePerETH;
-        tokenPrice = pricePerToken;
+        //(uint112 reserve0, uint112 reserve1, ) = _IUniswapV2Pair.getReserves();
+        //uint256 pricePerETH = (reserve0 * 1e12) / reserve1; //USDC only has 6 decimals
+        //uint256 pricePerToken = calcLastTokenPrice(_totalSupply);
+        //marketCap = pricePerToken * _totalSupply * pricePerETH;
+        //tokenPrice = pricePerToken;
 
         (bool sent, ) = payable(_msgSender()).call{value: amountETH}("");
         require(sent, "Failed to send Ether");
 
-        _IEventHandler.emitSellEvent(msg.sender, address(this), tokenAmount, amountETH, marketCap, pricePerToken, address(this).balance);
-
+        _IEventHandler.emitSellEvent(msg.sender, address(this), tokenAmount, amountETH, _balances[address(this)], address(this).balance);
     }   
 
     function calcTokenAmount (uint256 buyAmountETH) public view returns (uint256 tokenAmount){
         uint256 tokensToMint = 0;
-        uint256 currentSupply = _totalSupply;
+        uint256 currentSupply = _balances[address(this)] / scalingFactor;
         uint256 remainingETH = buyAmountETH;
 
         while (remainingETH >= a + (currentSupply * b )){
@@ -850,32 +851,20 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
            currentSupply++;
            tokensToMint++;
         }
-        return tokensToMint;
+        return tokensToMint * scalingFactor;
     }
 
     function calcETHamount(uint256 sellAmountToken)internal view returns (uint256) {
         uint256 ETHToSend = 0;
-        uint256 currentSupply = _totalSupply;
+        uint256 currentSupply = _balances[address(this)] / scalingFactor;
+        uint256 tokensToSell = sellAmountToken / scalingFactor;
 
-        for (uint256 i = 0; i < sellAmountToken ; i++) {
+        for (uint256 i = 0; i < tokensToSell ; i++) {
             uint256 currentTokenPrice = a + (currentSupply * b);
             ETHToSend += currentTokenPrice;
             currentSupply--;
         }
         return ETHToSend;
-    }
-
-    // Exponentiation function using fixed-point multiplication
-    function pow(uint256 base, uint256 exponent) internal pure returns (uint256) {
-        uint256 result = 1 ether;
-        while (exponent != 0) {
-            if (exponent % 2 != 0) {
-                result = result * base / 1 ether;
-            }
-            base = base * base / 1 ether;
-            exponent /= 2;
-        }
-        return result;
     }
  
     // Function to calculate the price of the last minted token
@@ -888,4 +877,3 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
 
 
 }
-

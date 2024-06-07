@@ -30,7 +30,7 @@ contract Factory {
     error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed);
 
 
-    function deployNewToken(address [] memory params, string memory name_, string memory symbol_, string memory description_, uint256 goal) external payable returns (address token){
+    function deployNewToken(address [] memory params, string memory name_, string memory symbol_, string memory description_) external payable returns (address token){
         if(!active) {revert ("contract is not active yet");}
         if(fee > msg.value) {revert ERC20InsufficientBalance(msg.sender, msg.sender.balance, fee);}
         if(fee > msg.sender.balance) {revert ERC20InsufficientBalance(msg.sender, msg.sender.balance, fee);}
@@ -41,8 +41,7 @@ contract Factory {
             symbol_,
             description_,
             _a,
-            _b,
-            goal
+            _b
         ));
 
         deployedTokens.push(address(token));
@@ -60,7 +59,7 @@ contract Factory {
 
         Ownership(token).renounceOwnership();
 
-        IEventHandler(eventHandler).emitCreationEvent(msg.sender, address(token), name_, symbol_, description_, goal);
+        IEventHandler(eventHandler).emitCreationEvent(msg.sender, address(token), name_, symbol_, description_);
     }
 
     function changeOwner(address _owner) external {

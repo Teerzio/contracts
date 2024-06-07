@@ -11,8 +11,8 @@ const {
     async function fixture(){
         //set up factory
       const initialFee = ethers.utils.parseUnits("0.1", "ether"); // This equals 10 ** 17 wei
-      const a = ethers.utils.parseUnits("0.000001", "ether"); // This equals 10 ** 17 wei
-      const b = ethers.utils.parseUnits("0.0000002", "ether"); // This equals 10 ** 17 wei
+      const a = ethers.utils.parseUnits("0.001", "ether"); // This equals 10 ** 17 wei
+      const b = ethers.utils.parseUnits("0.0002", "ether"); // This equals 10 ** 17 wei
 
       const [factoryOwner, tokenCreator, randomBuyer, trader1, trader2, trader3] = await ethers.getSigners();
 
@@ -35,11 +35,9 @@ const {
 
       //deploy new tokenContract
       let tokenAddress;
-      const raise = ethers.utils.parseUnits("1", "ether"); // This equals 10 ** 17 wei
-      const txValue = raise.add(initialFee)
 
       const active = await ownerConnect.setActive();
-      const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", raise, {value: txValue.toString()});
+      const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", {value: initialFee.toString()});
       const receipt = await txResponse.wait();
       
 
@@ -223,7 +221,7 @@ const {
             const trader3Connect = TokenContract.connect(trader3);
 
             const buyAmountETH = ethers.utils.parseUnits("0.3","ether")
-            const buyAmountETH1 = ethers.utils.parseUnits("0.4","ether")
+            const buyAmountETH1 = ethers.utils.parseUnits("0.3","ether")
             const buyAmountETH2 = ethers.utils.parseUnits("0.3","ether")
             
             const response = await randomBuyerConnect.buy("10", {value: buyAmountETH.toString()})
@@ -231,16 +229,16 @@ const {
             const response1 = await trader1Connect.buy("100", {value: buyAmountETH1.toString()})
             await response1.wait()
 
-            const response2 = await trader2Connect.buy("0", {value: buyAmountETH2.toString()})
+            const response2 = await trader2Connect.buy("100", {value: buyAmountETH2.toString()})
             await response2.wait()
 
-            const response3 = await trader3Connect.buy("0", {value: buyAmountETH2.toString()})
+            const response3 = await trader3Connect.buy("200", {value: buyAmountETH2.toString()})
             await response3.wait()
 
-            const response4 = await trader3Connect.buy("0", {value: buyAmountETH2.toString()})
+            const response4 = await trader3Connect.buy("300", {value: buyAmountETH2.toString()})
             await response4.wait()
 
-            const response5 = await trader2Connect.buy("0", {value: buyAmountETH2.toString()})
+            const response5 = await trader2Connect.buy("400", {value: buyAmountETH2.toString()})
             await response5.wait()
 
 
