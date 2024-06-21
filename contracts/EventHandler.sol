@@ -16,8 +16,8 @@ contract EventHandler {
     }
 
     event Created(address owner, address tokenAddress, string name, string symbol, string description, uint256 timestamp);
-    event Bought(address buyer, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance, uint256 timestamp);
-    event Sold(address seller, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance, uint256 timestamp);
+    event Bought(address buyer, address tokenAddress, uint256 amountToken, uint256 lastTokenPrice, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance, uint256 userTokenBalance, uint256 timestamp);
+    event Sold(address seller, address tokenAddress, uint256 amountToken, uint256 lastTokenPrice, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance, uint256 userTokenBalance, uint256 timestamp);
     event LaunchedOnUniswap(address tokenAddress, address pairAddress, uint256 amountETHToLiq, uint256 amountTokensToLiq, uint256 timestamp);
 
     function emitCreationEvent(address owner, address tokenAddress, string memory name, string memory symbol, string memory description) external {
@@ -26,16 +26,16 @@ contract EventHandler {
         emit Created(owner, tokenAddress, name, symbol, description, block.timestamp);
     }
 
-    function emitBuyEvent(address buyer, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance) external {
+    function emitBuyEvent(address buyer, address tokenAddress, uint256 amountToken, uint256 lastTokenPrice, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance, uint256 userTokenBalance) external {
         require(callers[msg.sender], "you are not allowed to call this function");
 
-        emit Bought(buyer, tokenAddress, amountToken, amountETH, contractTokenBalance, contractETHBalance, block.timestamp);
+        emit Bought(buyer, tokenAddress, amountToken, lastTokenPrice, amountETH, contractTokenBalance, contractETHBalance, userTokenBalance, block.timestamp);
     }
 
-    function emitSellEvent(address seller, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance) external {
+    function emitSellEvent(address seller, address tokenAddress, uint256 amountToken, uint256 lastTokenPrice, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance, uint256 userTokenBalance) external {
         require(callers[msg.sender], "you are not allowed to call this function");
 
-        emit Sold(seller, tokenAddress, amountToken, amountETH, contractTokenBalance, contractETHBalance, block.timestamp);
+        emit Sold(seller, tokenAddress, amountToken, lastTokenPrice, amountETH, contractTokenBalance, contractETHBalance, userTokenBalance, block.timestamp);
     }
 
     function emitLaunchedOnUniswap(address tokenAddress, address pairAddress, uint256 amountETHToLiq, uint256 amountTokensToLiq ) external {

@@ -30,7 +30,7 @@ contract Factory {
     error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed);
 
 
-    function deployNewToken(address [] memory params, string memory name_, string memory symbol_, string memory description_) external payable returns (address token){
+    function deployNewToken(address [] memory params, string memory name_, string memory symbol_, string memory description_, address _fee, uint256 buyAmount) external payable returns (address token){
         if(!active) {revert ("contract is not active yet");}
         if(fee > msg.value) {revert ERC20InsufficientBalance(msg.sender, msg.sender.balance, fee);}
         if(fee > msg.sender.balance) {revert ERC20InsufficientBalance(msg.sender, msg.sender.balance, fee);}
@@ -41,18 +41,19 @@ contract Factory {
             symbol_,
             description_,
             _a,
-            _b
+            _b,
+            _fee
         ));
 
         deployedTokens.push(address(token));
         IEventHandler(eventHandler).updateCallers(address(token));
 
-       /* 
+       
        if(buyAmount > 0){
-            IModulusToken(token).buy{value: buyAmount}(buyAmount);
-            IERC20(token).transfer(msg.sender, buyAmount);
+            uint256 buyFee = buyAmount * 5 / 1000;
+            IToken(token).devBuy{value: buyAmount + buyFee }(buyAmount, msg.sender);
         } 
-        */
+    
 
         (bool sentFee, ) = payable(owner).call{value: fee}("");
         require(sentFee, "Failed to send Ether");

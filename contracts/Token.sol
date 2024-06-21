@@ -2,6 +2,48 @@
 
 pragma solidity ^0.8.19;
 
+library SafeMath {
+
+  /**
+  * @dev Multiplies two numbers, throws on overflow.
+  */
+  function mul(uint256 a, uint256 b) internal pure returns (uint256 c) {
+    if (a == 0) {
+      return 0;
+    }
+    c = a * b;
+    assert(c / a == b);
+    return c;
+  }
+
+  /**
+  * @dev Integer division of two numbers, truncating the quotient.
+  */
+  function div(uint256 a, uint256 b) internal pure returns (uint256) {
+    // assert(b > 0); // Solidity automatically throws when dividing by 0
+    // uint256 c = a / b;
+    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+    return a / b;
+  }
+
+  /**
+  * @dev Subtracts two numbers, throws on overflow (i.e. if subtrahend is greater than minuend).
+  */
+  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+    assert(b <= a);
+    return a - b;
+  }
+
+  /**
+  * @dev Adds two numbers, throws on overflow.
+  */
+  function add(uint256 a, uint256 b) internal pure returns (uint256 c) {
+    c = a + b;
+    assert(c >= a);
+    return c;
+  }
+}
+
 abstract contract Context {
     function _msgSender() internal view virtual returns (address) {
         return msg.sender;
@@ -16,7 +58,7 @@ abstract contract Context {
     }
 }
 contract Ownable is Context {
-    address private _owner;
+    address public _owner;
 
     error OwnableUnauthorizedAccount(address account);
     error OwnableInvalidOwner(address owner);
@@ -453,27 +495,30 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
 
 interface IEventHandler {
         function emitCreationEvent(address owner, address tokenAddress, string memory name, string memory symbol, string memory description) external;
-        function emitBuyEvent(address buyer, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance) external;
-        function emitSellEvent(address seller, address tokenAddress, uint256 amountToken, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance) external;
+        function emitBuyEvent(address buyer, address tokenAddress, uint256 amountToken, uint256 lastTokenPrice, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance, uint256 userTokenBalance) external;
+        function emitSellEvent(address seller, address tokenAddress, uint256 amountToken, uint256 lastTokenPrice, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance, uint256 userTokenBalance) external;
         function emitLaunchedOnUniswap(address tokenAddress, address pairAddress, uint256 amountETHToLiq, uint256 amountTokensToLiq) external;
         function updateCallers(address newCaller) external;
 }
 
-interface IModulusToken {
+interface IToken {
     
     function buy(uint256 buyAmount) external payable;
+    function devBuy(uint256 buyAmount, address dev)external payable;
     function sell(uint256 tokenAmount) external payable;
 }
 
 contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard, Ownable {
+    using SafeMath for uint256;
     
     
     mapping(address account => uint256) public _balances;
     mapping(address account => mapping(address spender => uint256)) private _allowances;
 
-    uint256 public _totalSupply = 100_000_000 * 10 ** 18;
-    uint256 private scalingFactor = 100_000;
-    uint256 public immutable threshold = 25_000_000 * 10 **18;
+    uint256 public _totalSupply;
+    uint256 public _availableSupply;
+    uint256 public _currentSupply;
+    uint256 public _lastTokenPrice;
 
 
     string private _name;
@@ -484,24 +529,33 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
     uint256 public tokenPrice;
     uint256 private a;
     uint256 private b;
-    uint256 public raised;
+    address private fee;
 
     bool public isLaunched;
+    bool public devBought;
 
     IUniswapV2Pair public _IUniswapV2Pair;
     IUniswapV2Factory public _IUniswapV2Factory;
     IUniswapV2Router02 public _IUniswapV2Router;
     IEventHandler public _IEventHandler;
 
-    error InsufficientOutputAmount();
+    error InsufficientTokenOutputAmount(uint256 tokensCalculated, uint256 tokensRequested);
     error InsufficientContractBalance(uint256 contractTokenBalance, uint256 tokensRequested);
+    error InsufficientContractETHBalance(uint256 contractBalance, uint256 ETHRequested);
+    error InsufficientETHOutputAmount(uint256 ETHCalculated, uint256 ETHRequested);
+    error TokenAlreadyLaunched();
+    error TokenNotLaunched();
+    error InsufficientFunds();
+    error InsufficientValue(uint256 valueSent, uint256 valueNeeded);
+    error DevAlreadyBought();
+
     /**
      * @dev Sets the values for {name} and {symbol}.
      *
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(address [] memory params, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b) {
+    constructor(address [] memory params, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b, address _fee) {
         _IEventHandler = IEventHandler(params[0]);
         _IUniswapV2Pair = IUniswapV2Pair(params[1]);
         _IUniswapV2Factory = IUniswapV2Factory(params[2]);
@@ -511,7 +565,11 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         _description = description_;
         a = _a;
         b = _b;
-        _balances[address(this)] = 100_000_000 * 10 ** 18;
+        _totalSupply = 100_000 * 10 ** 18;
+        _availableSupply = 75_000 * 10 ** 18;
+        _balances[address(this)] = _totalSupply;
+        fee = _fee;
+        _currentSupply = 0;
     }
 
     /**
@@ -648,6 +706,7 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
      * Emits a {Transfer} event.
      */
     function _update(address from, address to, uint256 value) internal virtual {
+        if (!isLaunched){revert TokenNotLaunched();}
         if (from == address(0)) {
             // Overflow check required: The rest of the code assumes that totalSupply never overflows
             _totalSupply += value; 
@@ -777,103 +836,157 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         }
     }
 
-    function buy (uint256 minimumTokens) external payable nonReentrant{
+    function buy (uint256 minimumTokens, uint256 amountETH) external payable nonReentrant{
         //checks
-        uint256 tokenAmount = calcTokenAmount(msg.value);
-        if(tokenAmount > _balances[address(this)]) {revert InsufficientContractBalance(_balances[address(this)], tokenAmount);}
-        if(tokenAmount < minimumTokens) {revert InsufficientOutputAmount();}
+        if (isLaunched){revert TokenAlreadyLaunched();}
+        uint256 feeETH = amountETH * 5 / 1000;
+        if (_msgSender().balance < amountETH + feeETH){revert InsufficientFunds();}
+        if (msg.value < amountETH + feeETH){revert InsufficientValue(msg.value, amountETH + feeETH);}
+        uint256 tokenAmount = calcTokenAmount(amountETH);
+        if(_currentSupply + tokenAmount > _availableSupply) {revert InsufficientContractBalance(_availableSupply - _currentSupply, tokenAmount);}
+        if(tokenAmount < minimumTokens) {revert InsufficientTokenOutputAmount(tokenAmount, minimumTokens);}
         
-
-        //reserve0 = WETH, reserve1 = USDC
-        //(uint112 reserve0, uint112 reserve1, ) = _IUniswapV2Pair.getReserves();
-        //uint256 pricePerETH = (reserve0 * 1e12) / reserve1; //USDC only has 6 decimals
-
-        transferFrom(address(this), msg.sender, tokenAmount);
-        //uint256 pricePerToken = calcLastTokenPrice(_totalSupply);
-        //marketCap = pricePerToken * _totalSupply * pricePerETH;
-        //tokenPrice = pricePerToken;
+        _balances[address(this)] -= tokenAmount;
+        _balances[_msgSender()] += tokenAmount;
+        _currentSupply += tokenAmount;
+        _lastTokenPrice = calcLastTokenPrice();
+    
         
-        (bool sendETH, ) = payable(address(this)).call{value: msg.value}("");
-        require(sendETH, "Failed to send Ether");
+        (bool sendETH, ) = payable(address(this)).call{value: amountETH }("");
+        require(sendETH, "Failed to send buy Ether to contract");
+        (bool sendFee, ) = payable(fee).call{value: feeETH}("");
+        require(sendFee, "Failed to send buy fee Ether");
 
 
-        if (!isLaunched && _balances[address(this)] < threshold && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)) {
+        if (_currentSupply > 65_000 * 10 ** 18 && !isLaunched/* && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)*/) {
             launchOnUniswap();
         }
         
-        _IEventHandler.emitBuyEvent(msg.sender, address(this), tokenAmount, msg.value, _balances[address(this)], address(this).balance);
+        _IEventHandler.emitBuyEvent(msg.sender, address(this), tokenAmount, _lastTokenPrice, msg.value, _balances[address(this)], address(this).balance, _balances[_msgSender()]);
          
     }
 
-    event LogUints (uint256 amountETHToLiq, uint256 amountTokensToLiq);
     function launchOnUniswap() internal{
-        uint256 amountETHToLiq = address(this).balance / 4;
-        uint256 amountTokensToLiq = calcTokenAmount(amountETHToLiq);
-        emit LogUints(amountETHToLiq, amountTokensToLiq);
+        uint256 amountETHToLiq = address(this).balance;
+        uint256 amountTokensToLiq = 25_000 * 10 ** 18;
 
         _approve(address(this), address(_IUniswapV2Router), amountTokensToLiq);
+        isLaunched = true;
 
         address pair = _IUniswapV2Factory.createPair(address(this), _IUniswapV2Router.WETH());
         _IUniswapV2Router.addLiquidityETH{value: amountETHToLiq}(address(this), amountTokensToLiq, amountTokensToLiq, amountETHToLiq, address(0), block.timestamp);
-        isLaunched = true;
 
         _IEventHandler.emitLaunchedOnUniswap(address(this), pair, amountETHToLiq, amountTokensToLiq);
 
     }
+    
+    function devBuy (uint256 amountETH, address dev) external payable nonReentrant{
+        //checks
+        if(devBought){revert DevAlreadyBought();}
+        uint256 feeETH = amountETH * 5 / 1000;
+        if (dev.balance < amountETH + feeETH){revert InsufficientFunds();}
+        if (msg.value < amountETH + feeETH){revert InsufficientValue(msg.value, amountETH + feeETH);}
+        uint256 tokenAmount = calcTokenAmount(amountETH);
+        if(_totalSupply - _balances[address(this)] + tokenAmount > _availableSupply) {revert InsufficientContractBalance(_availableSupply - _balances[address(this)], tokenAmount);}
+        
+        _balances[address(this)] -= tokenAmount;
+        _balances[dev] += tokenAmount;
+        _currentSupply += tokenAmount;
+        _lastTokenPrice = calcLastTokenPrice();
+    
+        
+        (bool sendETH, ) = payable(address(this)).call{value: amountETH}("");
+        require(sendETH, "Failed to send buy Ether to contract");
+        (bool sendFee, ) = payable(fee).call{value: feeETH}("");
+        require(sendFee, "Failed to send buy fee Ether");
+
+
+        if (_currentSupply > 65_000 * 10 ** 18 && !isLaunched/* && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)*/) {
+            launchOnUniswap();
+        }
+        
+        devBought = true;
+
+        _IEventHandler.emitBuyEvent(msg.sender, address(this), tokenAmount, _lastTokenPrice, msg.value, _balances[address(this)], address(this).balance, _balances[_msgSender()]);
+         
+    }
 
     function sell(uint256 tokenAmount, uint256 minETHAmount) external payable nonReentrant{
-        if (tokenAmount > balanceOf(msg.sender)) {revert ERC20InsufficientBalance(msg.sender, balanceOf(msg.sender), tokenAmount);}
-        uint256 amountETH = calcETHamount(tokenAmount);
-        if (amountETH > address(this).balance) {revert ERC20InsufficientBalance(address(this), address(this).balance, amountETH);}
-        require (amountETH  >= minETHAmount, "insufficient output amount");
+        if (isLaunched){revert TokenAlreadyLaunched();}
+        if (tokenAmount > balanceOf(_msgSender())) {revert ERC20InsufficientBalance(msg.sender, balanceOf(_msgSender()), tokenAmount);}
+        uint256 amountETH = calcETHAmount(tokenAmount);
+        uint256 feeETH = amountETH * 5 / 1000;
+        if (amountETH - feeETH > address(this).balance) {revert InsufficientContractETHBalance(address(this).balance, amountETH - feeETH);}
+        if (amountETH - feeETH < minETHAmount){revert InsufficientETHOutputAmount(amountETH - feeETH, minETHAmount);}
 
-        transferFrom(msg.sender, address(this), tokenAmount);
 
-        //(uint112 reserve0, uint112 reserve1, ) = _IUniswapV2Pair.getReserves();
-        //uint256 pricePerETH = (reserve0 * 1e12) / reserve1; //USDC only has 6 decimals
-        //uint256 pricePerToken = calcLastTokenPrice(_totalSupply);
-        //marketCap = pricePerToken * _totalSupply * pricePerETH;
-        //tokenPrice = pricePerToken;
+       _balances[_msgSender()] -= tokenAmount;
+       _balances[address(this)] += tokenAmount;
+       _currentSupply -= tokenAmount;
+       _lastTokenPrice = calcLastTokenPrice();
 
-        (bool sent, ) = payable(_msgSender()).call{value: amountETH}("");
-        require(sent, "Failed to send Ether");
 
-        _IEventHandler.emitSellEvent(msg.sender, address(this), tokenAmount, amountETH, _balances[address(this)], address(this).balance);
+        (bool sent, ) = payable(_msgSender()).call{value: amountETH - feeETH}("");
+        require(sent, "Failed to send sell Ether to contract");
+     
+        
+        if (address(this).balance < feeETH){
+            (bool sentFee, ) = payable(fee).call{value: address(this).balance}("");
+            require(sentFee, "Failed to send remaining sell fee Ether");
+        }else{
+            (bool sentFee, ) = payable(fee).call{value: feeETH}("");
+            require(sentFee, "Failed to send sell fee Ether");
+        }
+        
+
+        _IEventHandler.emitSellEvent(msg.sender, address(this), tokenAmount, _lastTokenPrice, amountETH, _balances[address(this)], address(this).balance, _balances[_msgSender()]);
     }   
 
-    function calcTokenAmount (uint256 buyAmountETH) public view returns (uint256 tokenAmount){
-        uint256 tokensToMint = 0;
-        uint256 currentSupply = _balances[address(this)] / scalingFactor;
-        uint256 remainingETH = buyAmountETH;
 
-        while (remainingETH >= a + (currentSupply * b )){
-           remainingETH -= a + (currentSupply * b);
-           currentSupply++;
-           tokensToMint++;
+
+// Function to calculate square root in Solidity
+  function sqrt(uint y) internal pure returns (uint z) {
+    if (y > 3) {
+        z = y;
+        uint x = y / 2 + 1;
+        while (x < z) {
+            z = x;
+            x = (y / x + x) / 2;
         }
-        return tokensToMint * scalingFactor;
+    } else if (y != 0) {
+        z = 1;
     }
+}
 
-    function calcETHamount(uint256 sellAmountToken)internal view returns (uint256) {
-        uint256 ETHToSend = 0;
-        uint256 currentSupply = _balances[address(this)] / scalingFactor;
-        uint256 tokensToSell = sellAmountToken / scalingFactor;
 
-        for (uint256 i = 0; i < tokensToSell ; i++) {
-            uint256 currentTokenPrice = a + (currentSupply * b);
-            ETHToSend += currentTokenPrice;
-            currentSupply--;
-        }
-        return ETHToSend;
-    }
+function calcTokenAmount(uint256 buyAmountETH) public view returns (uint256 tokenAmount) {
+   uint256 currentSupply = _currentSupply / (10 **18);
+    
+    uint256 root = ((a +b * currentSupply + b/2)**2 + 2 * b * buyAmountETH);
+    uint256 sol = sqrt(root);
+    uint256 calcAmount = (sol - a - b * currentSupply + b/2)/b;
+
+    return (calcAmount * 10 ** 18);
+}
+
+function calcETHAmount(uint256 sellAmountToken) public view returns (uint256) {
+    uint256 tokensToSell = sellAmountToken / (10 ** 18); // Convert to whole tokens
+    uint256 currentSupply = _currentSupply / (10 ** 18); // Convert to whole tokens
+
+    uint256 firstTerm = a + (currentSupply - 1) * b;
+    uint256 lastTerm = a + (currentSupply - tokensToSell) * b;
+    uint256 ETHToSend = tokensToSell * (firstTerm + lastTerm) / 2;
+
+
+    return ETHToSend;
+}
  
-    // Function to calculate the price of the last minted token
-    function calcLastTokenPrice(uint256 supply) public view returns (uint256) {
-        return a + (supply * b);
+   // Function to calculate the price of the last minted token
+    function calcLastTokenPrice() public view returns (uint256) {
+        return a + ((_currentSupply) * b);
     }
 
     receive () external payable {}
     fallback () external payable {}
-
 
 }

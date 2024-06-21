@@ -11,8 +11,8 @@ const {
     async function fixture(){
 
       const initialFee = ethers.utils.parseUnits("0.1", "ether"); // This equals 10 ** 17 wei
-      const a = ethers.utils.parseUnits("0.0001", "ether"); // This equals 10 ** 17 wei
-      const b = ethers.utils.parseUnits("0.00001", "ether"); // This equals 10 ** 17 wei
+      const a = ethers.utils.parseUnits("0.00001", "ether"); // This equals 10 ** 17 wei
+      const b = ethers.utils.parseUnits("0.000001", "ether"); // This equals 10 ** 17 wei
 
       const [factoryOwner, tokenCreator] = await ethers.getSigners();
 
@@ -73,11 +73,13 @@ const {
     describe("Creation of a new Token", function(){
       it("Should create a Token successfully", async function(){
         const { params, factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
-        const raise = ethers.utils.parseUnits("1", "ether"); // This equals 10 ** 17 wei
-        const txValue = raise.add(initialFee)
+        const buyAmount = ethers.utils.parseUnits("0.1", "ether"); // This equals 10 ** 17 wei
+        const buyFee = buyAmount.mul(5).div(1000)
+        const txValue = buyAmount.add(initialFee).add(buyFee)
         const active = await ownerConnect.setActive();
-        const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", {value: initialFee.toString()});
+        const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", factoryOwner.address, buyAmount, {value: txValue.toString()});
         const receipt = await txResponse.wait();
+        expect(txResponse).to.not.be.reverted
 
         const eventFilter = eventHandler.filters.Created();
         const events = await eventHandler.queryFilter(eventFilter, receipt.blockNumber, receipt.blockNumber);
@@ -85,6 +87,11 @@ const {
         if (events.length > 0) {
           const tokenAddress = events[0].args.tokenAddress; // Adjust based on how your event arguments are structured
           console.log("Token address:", tokenAddress);
+          TokenContract = await ethers.getContractAt("Token", tokenAddress);
+          ownerBalance = await TokenContract._balances(tokenCreator.address)
+          console.log("TokenCreator balance", ownerBalance)
+
+
       } else {
           console.error("No CreationEvent found");
       }
@@ -113,9 +120,12 @@ const {
     it("should send the fee to the owner", async function (){
       const { params, factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
       const active = await ownerConnect.setActive();
+      const buyAmount = ethers.utils.parseUnits("0.1", "ether"); // This equals 10 ** 17 wei
+      const buyFee = buyAmount.mul(5).div(1000)
+      const txValue = buyAmount.add(initialFee).add(buyFee)
       const ownerBalanceBefore = await ethers.provider.getBalance(factoryOwner.address);
-      const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", {value: initialFee.toString()});
-      const ownerBalanceAfter = ownerBalanceBefore.add(initialFee)
+      const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", factoryOwner.address, buyAmount, {value: txValue.toString()});
+      const ownerBalanceAfter = ownerBalanceBefore.add(initialFee).add(buyFee)
       const fetchOwnerBalanceAfter = await ethers.provider.getBalance(factoryOwner.address)
       expect(fetchOwnerBalanceAfter).to.equal(ownerBalanceAfter)
       console.log("ownerBalanceBefore", ownerBalanceBefore)
@@ -135,7 +145,11 @@ const {
         const { params, factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
 
         const active = await ownerConnect.setActive();
-        const txResponse = await tokenCreatorConnect.deployNewToken(params , "Token", "TKN", "description", {value: initialFee.toString()});
+        const buyAmount = ethers.utils.parseUnits("0.1", "ether"); // This equals 10 ** 17 wei
+        const buyFee = buyAmount.mul(5).div(1000)
+        const txValue = buyAmount.add(initialFee).add(buyFee)
+
+        const txResponse = await tokenCreatorConnect.deployNewToken(params , "Token", "TKN", "description", factoryOwner.address, buyAmount, {value: txValue.toString()});
         const receipt = await txResponse.wait();
 
         const eventFilter = eventHandler.filters.Created();
