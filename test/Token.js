@@ -470,7 +470,7 @@ const {
             const randomBuyerConnect = TokenContract.connect(randomBuyer);
             const buyAmountETH = ethers.utils.parseEther("0.1")
             const value= buyAmountETH.add(buyAmountETH.mul(5).div(1000))
-            expect(randomBuyerConnect.buy("20", buyAmountETH, {value: buyAmountETH.toString()})).to.be.revertedWithCustomError
+            await expect(randomBuyerConnect.buy("20", buyAmountETH, {value: buyAmountETH.toString()})).to.be.revertedWithCustomError
 
         })
         it("should revert when calling the dev buy after deployment", async function(){
@@ -479,7 +479,7 @@ const {
             const randomBuyerConnect = TokenContract.connect(randomBuyer);
             const buyAmountETH = ethers.utils.parseEther("0.1")
             const value= buyAmountETH.add(buyAmountETH.mul(5).div(1000))
-            expect(randomBuyerConnect.devBuy(buyAmountETH, randomBuyer.address, {value: buyAmountETH.toString()})).to.be.revertedWithCustomError
+            await expect(randomBuyerConnect.devBuy(buyAmountETH, randomBuyer.address, {value: buyAmountETH.toString()})).to.be.revertedWithCustomError
 
         })
         it("should revert when trying to sell more tokens than balanceOf", async function(){
@@ -491,7 +491,7 @@ const {
             const response = await randomBuyerConnect.buy("10", buyAmountETH, {value: value})
 
             const balance = await TokenContract._balances(randomBuyer.address)
-            expect(randomBuyerConnect.sell(balance.add(100), buyAmountETH)).to.be.reverted
+            await expect(randomBuyerConnect.sell(balance.add(100), buyAmountETH)).to.be.reverted
         })
         it("should revert when asking for too much ETH in return for Tokens", async function(){
             const {a, tokenAddress, randomBuyer, trader1} = context
@@ -502,7 +502,7 @@ const {
             const response = await randomBuyerConnect.buy("10", buyAmountETH, {value: value})
 
             const balance = await TokenContract._balances(randomBuyer.address)
-            expect(randomBuyerConnect.sell(balance, buyAmountETH)).to.be.revertedWithCustomError
+            await expect(randomBuyerConnect.sell(balance, buyAmountETH)).to.be.revertedWithCustomError
         })
         it("should succeed when asking for the max amount of ETH in return for Tokens", async function(){
             const {a, tokenAddress, randomBuyer, trader1} = context
@@ -519,7 +519,7 @@ const {
             const ETHAfterFee = calcETH.sub((calcETH.mul(5).div(1000)))
             console.log("eth after fee", ethers.utils.formatUnits(ETHAfterFee.toString()))
             const sellTx = await randomBuyerConnect.sell(balance, ETHAfterFee)
-            expect(sellTx).to.not.be.reverted
+            await expect(sellTx).to.not.be.reverted
         })
         it("should revert when tokens returned are less than slippage allows", async function(){
             const {a, tokenAddress, randomBuyer, trader1} = context
@@ -528,8 +528,21 @@ const {
             const buyAmountETH = ethers.utils.parseEther("0.1")
             const minTokens = await TokenContract.calcTokenAmount(buyAmountETH)
             const value = buyAmountETH.add(buyAmountETH.mul(5).div(1000))
-            expect(randomBuyerConnect.buy(minTokens.add(100), buyAmountETH, {value: value})).to.be.revertedWithCustomError
+            await expect(randomBuyerConnect.buy(minTokens.add(100), buyAmountETH, {value: value})).to.be.revertedWithCustomError
         })
+        it("should revert when someone is trying to buy more supply than is available", async function(){
+            const {a, tokenAddress, randomBuyer, trader1} = context
+            TokenContract = await ethers.getContractAt("Token", tokenAddress);
+
+            const randomBuyerConnect = TokenContract.connect(randomBuyer);
+            const buyAmountETH = ethers.utils.parseEther("2")
+            const value= buyAmountETH.add(buyAmountETH.mul(5).div(1000))
+            await expect(randomBuyerConnect.buy("10", buyAmountETH, {value: value})).to.be.reverted
+
+
+
+        })
+
 
 
     })
@@ -540,30 +553,32 @@ const {
         TokenContract = await ethers.getContractAt("Token", tokenAddress);
         const randomBuyerConnect = TokenContract.connect(randomBuyer);
         const buyAmountETH = ethers.utils.parseEther("0.1")
-        const value = ethers.utils.parseEther("0.1005")
-        const response = await randomBuyerConnect.buy("10", buyAmountETH, {value: value})
+        const value = buyAmountETH.add(buyAmountETH.mul(5).div(1000))
+        await randomBuyerConnect.buy("1", buyAmountETH, {value: value})
 
-        expect(randomBuyerConnect.transfer("100", trader1.address)).to.be.revertedWith("TokenNotLaunched()")
+        await expect(randomBuyerConnect.transfer(trader1.address, 100)).to.be.reverted
        })
        it("should allow a transfer after launch on DEX", async function(){
         const {a, tokenAddress, randomBuyer, trader1} = context
         TokenContract = await ethers.getContractAt("Token", tokenAddress);
         const randomBuyerConnect = TokenContract.connect(randomBuyer);
         const buyAmountETH = ethers.utils.parseEther("1")
+        const value = buyAmountETH.add(buyAmountETH.mul(5).div(1000))
+        await randomBuyerConnect.buy("1", buyAmountETH, {value: value})
 
-        expect(randomBuyerConnect.transfer("100", trader1.address)).to.not.be.reverted
+        await expect(randomBuyerConnect.transfer(trader1.address, 100)).to.not.be.reverted
        })
         
        it("should prohibit a buy and sell on the bonding curve after launch on DEX", async function(){
         const {a, tokenAddress, randomBuyer, trader1} = context
         TokenContract = await ethers.getContractAt("Token", tokenAddress);
         const randomBuyerConnect = TokenContract.connect(randomBuyer);
-        const buyAmountETH = ethers.utils.parseEther("0.1")
+        const buyAmountETH = ethers.utils.parseEther("0.9")
         const value = buyAmountETH.add(buyAmountETH.mul(5).div(1000))
-        const response = await randomBuyerConnect.buy("10", buyAmountETH, {value: value})
+        await randomBuyerConnect.buy("1", buyAmountETH, {value: value})
 
-        expect(randomBuyerConnect.buy("1", buyAmountETH, {value: value})).to.be.revertedWith("TokenAlreadyLaunched()")
-        expect(randomBuyerConnect.sell("1", "1")).to.be.revertedWith("TokenAlreadyLaunched()")
+        await expect(randomBuyerConnect.buy("1", buyAmountETH, {value: value})).to.be.reverted
+        await expect(randomBuyerConnect.sell("1", "1")).to.be.reverted
        })
       
        it("Token Ownership should be renounced", async function(){
