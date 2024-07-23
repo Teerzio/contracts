@@ -539,11 +539,7 @@ const {
             const value= buyAmountETH.add(buyAmountETH.mul(5).div(1000))
             await expect(randomBuyerConnect.buy("10", buyAmountETH, {value: value})).to.be.reverted
 
-
-
         })
-
-
 
     })
 
@@ -589,6 +585,23 @@ const {
 
         expect(owner).to.equal("0x0000000000000000000000000000000000000000")
 
+        })
+        it("should calculate the keccak256 of the events correctly", async function () {
+            const buyEventSignature = "Bought(address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint256)";
+            const buyHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(buyEventSignature));
+            console.log("buyHash", buyHash);
+
+            const sellEventSignature = "Sold(address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint256)";
+            const sellHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(sellEventSignature));
+            console.log("sellHash", sellHash);
+
+            const createdEventSignature = "Created(address,address,string,string,string,uint256)";
+            const createdHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(createdEventSignature));
+            console.log("createdHash", createdHash);
+
+            const uniswapEventSignature = "Bought(address,address,uint256,uint256,uint256)";
+            const uniswapHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(uniswapEventSignature));
+            console.log("uniswapHash", uniswapHash);
         })
     })
 

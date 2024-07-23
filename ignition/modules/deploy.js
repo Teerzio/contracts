@@ -31,9 +31,9 @@ const main = {
             WETH_USDC_PAIR: "0xa8B8cb1C5c9e13C3af86cc8aa5f0297Db69b099C",
             SushiSwapV2Factory: "0xc35DADB65012eC5796536bD9864eD8773aBc74C4",
             SushiSwapV2Router: "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506",
-            factory: '0x313892f6791598D89D6C21C7000De32031462788',
-            eventHandler:'0x73494f4c3238AFf66eCfc6B1D020872e513Bb95a',
-            deployedToken:"0xD22C19647Eec708B88748De0B98b3bdF1eE08cED"
+            factory: '0xA9B3b651bc5FfE3a9783541ED16E70430958B470',
+            eventHandler:'0xAF3B1FF5C33C9D144300f7Eb9EFD9a044fF5Acb2',
+            deployedToken:"0x36e8e95e465eda43e21185e77e91981971645079"
 
         }
     },
@@ -47,7 +47,7 @@ const main = {
 
                 const initialFee = ethers.utils.parseUnits("0.002", "ether")
                 const a = ethers.utils.parseUnits("0.000000001", "ether")
-                const b = ethers.utils.parseUnits("0.0000000001", "ether")
+                const b = ethers.utils.parseUnits("0.0000000005", "ether")
 
                 const Factory = await ethers.getContractFactory("Factory", wallet)
                 const factory = await Factory.deploy(initialFee, {gasLimit: 3000000, gasPrice: ethers.utils.parseUnits('20', 'gwei')})
@@ -70,45 +70,61 @@ const main = {
     launch:
         async () => {
             try{
-                const params = ["0x73494f4c3238AFf66eCfc6B1D020872e513Bb95a", "0xa8B8cb1C5c9e13C3af86cc8aa5f0297Db69b099C", "0xc35DADB65012eC5796536bD9864eD8773aBc74C4", "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506"]
+                const params = ["0xAF3B1FF5C33C9D144300f7Eb9EFD9a044fF5Acb2", "0xa8B8cb1C5c9e13C3af86cc8aa5f0297Db69b099C", "0xc35DADB65012eC5796536bD9864eD8773aBc74C4", "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506"]
                 const a = ethers.utils.parseUnits("0.000001", "ether"); // This equals 10 ** 17 wei
-                const b = ethers.utils.parseUnits("0.0000002", "ether"); // This equals 10 ** 17 wei
-                const goal = ethers.utils.parseUnits("0.01", "ether"); // This equals 10 ** 17 wei
+                const b = ethers.utils.parseUnits("0.0000005", "ether"); // This equals 10 ** 17 wei
                 const initialFee = ethers.utils.parseUnits("0.002", "ether")
 
                 const privateKey = process.env.PRIVATE_KEY;
-                const wallet = new ethers.Wallet(privateKey, ethers.provider); 
+                const wallet = new ethers.Wallet(privateKey, ethers.provider);
+                const buyAmount = ethers.utils.parseEther("0.0001")
+                const value = initialFee.add(buyAmount).add((buyAmount.mul(5).div(1000)))
             
                 console.log("wallet creating new Token", wallet.address);
 
-                Factory = await ethers.getContractAt("Factory", "0x313892f6791598D89D6C21C7000De32031462788");
+                Factory = await ethers.getContractAt("Factory", "0xA9B3b651bc5FfE3a9783541ED16E70430958B470");
                 const caller = Factory.connect(wallet)
 
                 //const response = await caller.setActive({gasLimit: 3000000, gasPrice: ethers.utils.parseUnits('20', 'gwei')})
+                //await response.wait()
 
-                const response = await caller.deployNewToken(params, "hello", "HELL", "dis just a test", goal, {gasLimit: 3000000, gasPrice: ethers.utils.parseUnits('20', 'gwei'), value: initialFee})
-                
-                console.log("response", response)
+                const response2 = await caller.deployNewToken(params, "hello", "HELL", "dis just a test", wallet.address, buyAmount, {gasLimit: 3000000, gasPrice: ethers.utils.parseUnits('20', 'gwei'), value: value})
+                await response2.wait()
+                console.log("response", response2)
 
             }
             catch(error){
                 console.log("error creating new token", error)
             }
-        },
+    },
     buy: 
         async () => {
             const privateKey = process.env.PRIVATE_KEY;
             const wallet = new ethers.Wallet(privateKey, ethers.provider); 
 
             const buyAmount= ethers.utils.parseEther("0.001")
+            const value = buyAmount.add(buyAmount.mul(5).div(1000))
             const minTokens= "10"
 
-            TokenContract = await ethers.getContractAt("Token", "0xD22C19647Eec708B88748De0B98b3bdF1eE08cED")
+            TokenContract = await ethers.getContractAt("Token", "0x36e8e95e465eda43e21185e77e91981971645079")
             const caller = TokenContract.connect(wallet)
 
-            const response = await caller.buy(minTokens, {gasLimit: 300000, gasPrice: ethers.utils.parseUnits('300', 'gwei'), value: buyAmount})
+            const response = await caller.buy(minTokens, buyAmount,{gasLimit: 300000, gasPrice: ethers.utils.parseUnits('300', 'gwei'), value: value})
             console.log("response", response)
+    },
+    balance:
+        async () => {
+            const privateKey = process.env.PRIVATE_KEY;
+            const wallet = new ethers.Wallet(privateKey, ethers.provider); 
+            TokenContract = await ethers.getContractAt("Token", "0x36e8e95e465eda43e21185e77e91981971645079")
+            const caller = TokenContract.connect(wallet)
+            const balance = await TokenContract._balances(wallet.address)
+            const BalanceOf = await TokenContract.balanceOf(wallet.address)
+            console.log("balance", ethers.utils.formatEther(balance))
+            console.log("balanceOf", ethers.utils.formatEther(BalanceOf))
+
         }
+    
 
     
 }
@@ -136,3 +152,10 @@ main.buy()
     console.error(error);
     process.exit(1);
 });
+
+/*main.balance()
+.then(() => process.exit(0))
+.catch(error => {
+    console.error(error);
+    process.exit(1);
+});*/

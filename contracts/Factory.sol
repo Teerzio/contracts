@@ -14,6 +14,8 @@ contract Factory {
 
     address public eventHandler;
     address [] public deployedTokens;
+    mapping (address => uint) launchIndexes;
+    uint launchIndex;
     address public owner;
     bool active;
     uint256 public fee;
@@ -47,6 +49,8 @@ contract Factory {
 
         deployedTokens.push(address(token));
         IEventHandler(eventHandler).updateCallers(address(token));
+        ++launchIndex;
+        launchIndexes[token] = launchIndex;
 
        
        if(buyAmount > 0){
@@ -59,6 +63,7 @@ contract Factory {
         require(sentFee, "Failed to send Ether");
 
         Ownership(token).renounceOwnership();
+
 
         IEventHandler(eventHandler).emitCreationEvent(msg.sender, address(token), name_, symbol_, description_);
     }

@@ -907,7 +907,7 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         
         devBought = true;
 
-        _IEventHandler.emitBuyEvent(msg.sender, address(this), tokenAmount, _lastTokenPrice, msg.value, _balances[address(this)], address(this).balance, _balances[_msgSender()]);
+        _IEventHandler.emitBuyEvent(dev, address(this), tokenAmount, _lastTokenPrice, msg.value, _balances[address(this)], address(this).balance, _balances[_msgSender()]);
          
     }
 

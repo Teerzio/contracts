@@ -7,6 +7,7 @@ pragma solidity ^0.8.19;
 contract EventHandler {
 
     mapping (address => bool) public callers;
+    address [] launchedOnUniswap;
 
     address public factory;
 
@@ -40,6 +41,7 @@ contract EventHandler {
 
     function emitLaunchedOnUniswap(address tokenAddress, address pairAddress, uint256 amountETHToLiq, uint256 amountTokensToLiq ) external {
         require(callers[msg.sender], "you are not allowed to call this function");
+        launchedOnUniswap.push(pairAddress);
 
         emit LaunchedOnUniswap(tokenAddress, pairAddress, amountETHToLiq, amountTokensToLiq, block.timestamp);
     }
