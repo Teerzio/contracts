@@ -24,16 +24,12 @@ const {
       const setA = await ownerConnect.setA(a);
       const setB = await ownerConnect.setB(b)
 
-
-      
       const EventHandler = await ethers.getContractFactory("EventHandler");
       const eventHandler = await EventHandler.deploy(factory.address);
       const setEventHandler = await factory.setEventHandler(eventHandler.address);
       console.log("EventHandler Address:", eventHandler.address);
 
-      const params = [eventHandler.address, "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc", "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f", "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"]
-
-
+      const params = [eventHandler.address, "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f", "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", factory.address]
       return { params, factoryOwner, tokenCreator, factory, eventHandler, initialFee, ownerConnect, tokenCreatorConnect, a, b };
 
     }

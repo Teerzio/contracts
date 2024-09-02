@@ -9,7 +9,7 @@ const {
 
 const main = {
     addresses:{
-        base:{
+        /*base:{
             UniswapV2Factory: '0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6',
             UniswapV2Router: '0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24',
             WETH_USDC_PAIR: '0x88A43bbDF9D098eEC7bCEda4e2494615dfD9bB9C',
@@ -26,8 +26,8 @@ const main = {
             WETH_USDC_PAIR: "0x229F3Cbc14053b44696046b6E7E57A2375dB63Fe",
             UniswapV2Factory: '0xB7f907f7A9eBC822a80BD25E224be42Ce0A698A0',
             UniswapV2Router:'0x425141165d3DE9FEC831896C016617a52363b687'
-        },
-        bnb_testnet:{
+        },*/
+        bnb_testnet_kek:{
             WETH_USDC_PAIR: "0xa8B8cb1C5c9e13C3af86cc8aa5f0297Db69b099C",
             SushiSwapV2Factory: "0xc35DADB65012eC5796536bD9864eD8773aBc74C4",
             SushiSwapV2Router: "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506",
@@ -35,6 +35,10 @@ const main = {
             eventHandler:'0xAF3B1FF5C33C9D144300f7Eb9EFD9a044fF5Acb2',
             deployedToken:"0x36e8e95e465eda43e21185e77e91981971645079"
 
+        },
+        bnb_testnet_based:{
+            factory: "0xA5D9059A277F599857e41bd34C5FF332Dabd1970",
+            eventhandler: "0x9eb55843b93F8cBd8dB7A5695eF581FDcc6E91c0"
         }
     },
     deploy:
@@ -45,7 +49,7 @@ const main = {
                 
                 console.log("Deploying contracts with the account:", wallet.address);
 
-                const initialFee = ethers.utils.parseUnits("0.002", "ether")
+                const initialFee = ethers.utils.parseUnits("0.001", "ether")
                 const a = ethers.utils.parseUnits("0.000000001", "ether")
                 const b = ethers.utils.parseUnits("0.0000000005", "ether")
 
@@ -70,7 +74,7 @@ const main = {
     launch:
         async () => {
             try{
-                const params = ["0xAF3B1FF5C33C9D144300f7Eb9EFD9a044fF5Acb2", "0xa8B8cb1C5c9e13C3af86cc8aa5f0297Db69b099C", "0xc35DADB65012eC5796536bD9864eD8773aBc74C4", "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506"]
+                const params = ["0xAF3B1FF5C33C9D144300f7Eb9EFD9a044fF5Acb2", "0xc35DADB65012eC5796536bD9864eD8773aBc74C4", "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506"]
                 const a = ethers.utils.parseUnits("0.000001", "ether"); // This equals 10 ** 17 wei
                 const b = ethers.utils.parseUnits("0.0000005", "ether"); // This equals 10 ** 17 wei
                 const initialFee = ethers.utils.parseUnits("0.002", "ether")
@@ -123,10 +127,17 @@ const main = {
             console.log("balance", ethers.utils.formatEther(balance))
             console.log("balanceOf", ethers.utils.formatEther(BalanceOf))
 
-        }
-    
-
-    
+    },
+    activate:
+        async () => {
+            const privateKey = process.env.PRIVATE_KEY;
+            const wallet = new ethers.Wallet(privateKey, ethers.provider); 
+            FactoryContract = await ethers.getContractAt("Factory", "0xA5D9059A277F599857e41bd34C5FF332Dabd1970")
+            const caller = FactoryContract.connect(wallet)
+            const response = await caller.setActive({gasLimit: 300000, gasPrice: ethers.utils.parseUnits('300', 'gwei')})
+            console.log("activate response", response)
+    }
+      
 }
 
 
@@ -146,12 +157,12 @@ const main = {
     process.exit(1);
 });*/
 
-main.buy()
+/*main.buy()
 .then(() => process.exit(0))
 .catch(error => {
     console.error(error);
     process.exit(1);
-});
+});*/
 
 /*main.balance()
 .then(() => process.exit(0))
@@ -159,3 +170,10 @@ main.buy()
     console.error(error);
     process.exit(1);
 });*/
+
+main.activate()
+.then(() => process.exit(0))
+.catch(error => {
+    console.error(error);
+    process.exit(1);
+});

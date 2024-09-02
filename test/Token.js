@@ -31,8 +31,7 @@ const {
       const eventHandler = await EventHandler.deploy(factory.address);
       const setEventHandler = await factory.setEventHandler(eventHandler.address);
 
-      const params = [eventHandler.address, "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc", "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f", "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"]
-
+      const params = [eventHandler.address, "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f", "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", factory.address]
 
 
       //deploy new tokenContract
@@ -40,7 +39,7 @@ const {
 
       const active = await ownerConnect.setActive();
       const buyAmount = ethers.utils.parseUnits("0.1", "ether"); // This equals 10 ** 17 wei
-    const buyFee = buyAmount.mul(5).div(1000)
+      const buyFee = buyAmount.mul(5).div(1000)
       const txValue = buyAmount.add(initialFee).add(buyFee)
       const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", factoryOwner.address, buyAmount, {value: txValue.toString()});
       const receipt = await txResponse.wait();
@@ -59,8 +58,8 @@ const {
         console.error("No CreationEvent found");
     }
 
-    UniswapV2Factory = await ethers.getContractAt("UniswapV2Factory", "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f");
-    UniswapV2Router = await ethers.getContractAt("UniswapV2Router02", "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D");
+        UniswapV2Factory = await ethers.getContractAt("UniswapV2Factory", "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f");
+        UniswapV2Router = await ethers.getContractAt("UniswapV2Router02", "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D");
 
 
 
@@ -382,6 +381,7 @@ const {
         it("should create a Uniswap pair and provide liquidity when goal is met", async function(){
             const {tokenAddress, randomBuyer, eventHandler, UniswapV2Factory, UniswapV2Router} = await loadFixture(fixture)
             console.log("initiate buy")
+            console.log("UniswapV2Factory", UniswapV2Factory.address)
             TokenContract = await ethers.getContractAt("Token", tokenAddress);
             const randomBuyerConnect = TokenContract.connect(randomBuyer);
             const buyAmountETH = ethers.utils.parseEther("1")
@@ -599,7 +599,7 @@ const {
             const createdHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(createdEventSignature));
             console.log("createdHash", createdHash);
 
-            const uniswapEventSignature = "Bought(address,address,uint256,uint256,uint256)";
+            const uniswapEventSignature = "LaunchedOnUniswap(address,address,uint256,uint256,uint256)";
             const uniswapHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(uniswapEventSignature));
             console.log("uniswapHash", uniswapHash);
         })

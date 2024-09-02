@@ -64,7 +64,6 @@ contract Factory {
 
         Ownership(token).renounceOwnership();
 
-
         IEventHandler(eventHandler).emitCreationEvent(msg.sender, address(token), name_, symbol_, description_);
     }
 
@@ -81,6 +80,11 @@ contract Factory {
     function setActive() external {
         require(msg.sender == owner, "only the owner can call this function");
         active = true;
+    }
+
+    function setInactive() external {
+         require(msg.sender == owner, "only the owner can call this function");
+        active = false;
     }
 
     function setA (uint256 a) external {

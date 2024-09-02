@@ -2,47 +2,6 @@
 
 pragma solidity ^0.8.19;
 
-library SafeMath {
-
-  /**
-  * @dev Multiplies two numbers, throws on overflow.
-  */
-  function mul(uint256 a, uint256 b) internal pure returns (uint256 c) {
-    if (a == 0) {
-      return 0;
-    }
-    c = a * b;
-    assert(c / a == b);
-    return c;
-  }
-
-  /**
-  * @dev Integer division of two numbers, truncating the quotient.
-  */
-  function div(uint256 a, uint256 b) internal pure returns (uint256) {
-    // assert(b > 0); // Solidity automatically throws when dividing by 0
-    // uint256 c = a / b;
-    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-    return a / b;
-  }
-
-  /**
-  * @dev Subtracts two numbers, throws on overflow (i.e. if subtrahend is greater than minuend).
-  */
-  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-    assert(b <= a);
-    return a - b;
-  }
-
-  /**
-  * @dev Adds two numbers, throws on overflow.
-  */
-  function add(uint256 a, uint256 b) internal pure returns (uint256 c) {
-    c = a + b;
-    assert(c >= a);
-    return c;
-  }
-}
 
 abstract contract Context {
     function _msgSender() internal view virtual returns (address) {
@@ -166,23 +125,6 @@ interface IERC20 {
      */
     function transferFrom(address from, address to, uint256 value) external returns (bool);
 
-}
-
-interface IERC20Metadata is IERC20 {
-    /**
-     * @dev Returns the name of the token.
-     */
-    function name() external view returns (string memory);
-
-    /**
-     * @dev Returns the symbol of the token.
-     */
-    function symbol() external view returns (string memory);
-
-    /**
-     * @dev Returns the decimals places of the token.
-     */
-    function decimals() external view returns (uint8);
 }
 
 interface IERC20Errors {
@@ -495,8 +437,8 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
 
 interface IEventHandler {
         function emitCreationEvent(address owner, address tokenAddress, string memory name, string memory symbol, string memory description) external;
-        function emitBuyEvent(address buyer, address tokenAddress, uint256 amountToken, uint256 lastTokenPrice, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance, uint256 userTokenBalance) external;
-        function emitSellEvent(address seller, address tokenAddress, uint256 amountToken, uint256 lastTokenPrice, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance, uint256 userTokenBalance) external;
+        function emitBuyEvent(address buyer, address tokenAddress, uint256 amountToken, uint256 tokenPriceBefore, uint256 lastTokenPrice, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance, uint256 userTokenBalance) external;
+        function emitSellEvent(address seller, address tokenAddress, uint256 amountToken, uint256 tokenPriceBefore, uint256 lastTokenPrice, uint256 amountETH, uint256 contractTokenBalance, uint256 contractETHBalance, uint256 userTokenBalance) external;
         function emitLaunchedOnUniswap(address tokenAddress, address pairAddress, uint256 amountETHToLiq, uint256 amountTokensToLiq) external;
         function updateCallers(address newCaller) external;
 }
@@ -508,16 +450,15 @@ interface IToken {
     function sell(uint256 tokenAmount) external payable;
 }
 
-contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard, Ownable {
-    using SafeMath for uint256;
+contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
     
     
     mapping(address account => uint256) public _balances;
     mapping(address account => mapping(address spender => uint256)) private _allowances;
 
-    uint256 public _totalSupply;
-    uint256 public _availableSupply;
-    uint256 public _currentSupply;
+    uint256 public _totalSupply; // the total supply of the token, which is 100,000
+    uint256 public _availableSupply; // the max available amount of tokens on the bonding curve, which is 75,000. 25,000 tokens are reserved for the launch on DEX
+    uint256 public _currentSupply; // the amount of tokens bought by users on the bonding curve.
     uint256 public _lastTokenPrice;
 
 
@@ -525,19 +466,17 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
     string private _symbol;
     string private _description;
     
-    uint256 public marketCap;
-    uint256 public tokenPrice;
     uint256 private a;
     uint256 private b;
-    address private fee;
+    address private fee; //address to receive the trading fees
 
     bool public isLaunched;
-    bool public devBought;
 
-    IUniswapV2Pair public _IUniswapV2Pair;
     IUniswapV2Factory public _IUniswapV2Factory;
     IUniswapV2Router02 public _IUniswapV2Router;
     IEventHandler public _IEventHandler;
+
+    address factory;
 
     error InsufficientTokenOutputAmount(uint256 tokensCalculated, uint256 tokensRequested);
     error InsufficientContractBalance(uint256 contractTokenBalance, uint256 tokensRequested);
@@ -548,6 +487,7 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
     error InsufficientFunds();
     error InsufficientValue(uint256 valueSent, uint256 valueNeeded);
     error DevAlreadyBought();
+    error OnlyFactory();
 
     /**
      * @dev Sets the values for {name} and {symbol}.
@@ -557,9 +497,9 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
      */
     constructor(address [] memory params, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b, address _fee) {
         _IEventHandler = IEventHandler(params[0]);
-        _IUniswapV2Pair = IUniswapV2Pair(params[1]);
-        _IUniswapV2Factory = IUniswapV2Factory(params[2]);
-        _IUniswapV2Router = IUniswapV2Router02(params[3]);
+        _IUniswapV2Factory = IUniswapV2Factory(params[1]);
+        _IUniswapV2Router = IUniswapV2Router02(params[2]);
+        factory = params[3];
         _name = name_;
         _symbol = symbol_;
         _description = description_;
@@ -706,7 +646,6 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
      * Emits a {Transfer} event.
      */
     function _update(address from, address to, uint256 value) internal virtual {
-        if (!isLaunched){revert TokenNotLaunched();}
         if (from == address(0)) {
             // Overflow check required: The rest of the code assumes that totalSupply never overflows
             _totalSupply += value; 
@@ -836,13 +775,30 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         }
     }
 
+    /**
+        * @dev Bonding Curve Buy Function
+        * 
+        * allows an actor to buy the token directly from the contract.
+        * minimumTokens provides the possibility to set slippage to the user.
+        * amountETH is used to calculate the amount of tokens to buy after deducting a transaction fee of 0.5% on amountETH.
+        * the function will revert if...
+        *  - the token has already launched through the bonding curve contract
+        *  - the ETH-balance of the user is unsufficient or msg.value is insufficient
+        *  - the desired buy amount of tokens by the user exceeds the cavailabe supply
+
+        * if the _currentSupply exceeds an amount of 65,000 tokens, the launchOnUniswap() will be triggered
+
+        * the function calls the eventHandler contract to emit a buy event for this particular token.
+
+     **/
     function buy (uint256 minimumTokens, uint256 amountETH) external payable nonReentrant{
+        uint256 tokenPriceBefore = calcLastTokenPrice();
         //checks
         if (isLaunched){revert TokenAlreadyLaunched();}
         uint256 feeETH = amountETH * 5 / 1000;
-        if (_msgSender().balance < amountETH + feeETH){revert InsufficientFunds();}
-        if (msg.value < amountETH + feeETH){revert InsufficientValue(msg.value, amountETH + feeETH);}
-        uint256 tokenAmount = calcTokenAmount(amountETH);
+        if (_msgSender().balance < amountETH){revert InsufficientFunds();}
+        if (msg.value < amountETH){revert InsufficientValue(msg.value, amountETH + feeETH);}
+        uint256 tokenAmount = calcTokenAmount(amountETH - feeETH);
         if(_currentSupply + tokenAmount > _availableSupply) {revert InsufficientContractBalance(_availableSupply - _currentSupply, tokenAmount);}
         if(tokenAmount < minimumTokens) {revert InsufficientTokenOutputAmount(tokenAmount, minimumTokens);}
         
@@ -852,7 +808,7 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         _lastTokenPrice = calcLastTokenPrice();
     
         
-        (bool sendETH, ) = payable(address(this)).call{value: amountETH }("");
+        (bool sendETH, ) = payable(address(this)).call{value: amountETH - feeETH }("");
         require(sendETH, "Failed to send buy Ether to contract");
         (bool sendFee, ) = payable(fee).call{value: feeETH}("");
         require(sendFee, "Failed to send buy fee Ether");
@@ -862,10 +818,18 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
             launchOnUniswap();
         }
         
-        _IEventHandler.emitBuyEvent(msg.sender, address(this), tokenAmount, _lastTokenPrice, msg.value, _balances[address(this)], address(this).balance, _balances[_msgSender()]);
+        _IEventHandler.emitBuyEvent(_msgSender(), address(this), tokenAmount, tokenPriceBefore, _lastTokenPrice, msg.value, _balances[address(this)], address(this).balance, _balances[_msgSender()]);
          
     }
 
+    /**
+        * @dev Launch Function
+
+        * will be triggered by the buy() function once the _currentSupply crosses 65,000 tokens.
+        * creates the pair on Uniswap V2 and adds the amount of ETH held by the contract alongside 25,000 tokens.
+        * calls the eventHandler contract to emit a Launch event.
+
+     **/
     function launchOnUniswap() internal{
         uint256 amountETHToLiq = address(this).balance;
         uint256 amountTokensToLiq = 25_000 * 10 ** 18;
@@ -879,14 +843,20 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         _IEventHandler.emitLaunchedOnUniswap(address(this), pair, amountETHToLiq, amountTokensToLiq);
 
     }
+    /**
+        @dev Dev Buy Function to allow dev to buy tokens on creation.
+        * will be triggered by the factory when the token is created, should the dev enter a buy amount upon creation.
+        * can only be called by the factory in the function call which creates the contract.
+     */
     
     function devBuy (uint256 amountETH, address dev) external payable nonReentrant{
+        if(_msgSender() != factory){revert OnlyFactory();}
+
         //checks
-        if(devBought){revert DevAlreadyBought();}
         uint256 feeETH = amountETH * 5 / 1000;
-        if (dev.balance < amountETH + feeETH){revert InsufficientFunds();}
-        if (msg.value < amountETH + feeETH){revert InsufficientValue(msg.value, amountETH + feeETH);}
-        uint256 tokenAmount = calcTokenAmount(amountETH);
+        if (dev.balance < amountETH){revert InsufficientFunds();}
+        if (msg.value < amountETH){revert InsufficientValue(msg.value, amountETH);}
+        uint256 tokenAmount = calcTokenAmount(amountETH - feeETH);
         if(_totalSupply - _balances[address(this)] + tokenAmount > _availableSupply) {revert InsufficientContractBalance(_availableSupply - _balances[address(this)], tokenAmount);}
         
         _balances[address(this)] -= tokenAmount;
@@ -895,7 +865,7 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         _lastTokenPrice = calcLastTokenPrice();
     
         
-        (bool sendETH, ) = payable(address(this)).call{value: amountETH}("");
+        (bool sendETH, ) = payable(address(this)).call{value: amountETH - feeETH}("");
         require(sendETH, "Failed to send buy Ether to contract");
         (bool sendFee, ) = payable(fee).call{value: feeETH}("");
         require(sendFee, "Failed to send buy fee Ether");
@@ -905,15 +875,29 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
             launchOnUniswap();
         }
         
-        devBought = true;
-
-        _IEventHandler.emitBuyEvent(dev, address(this), tokenAmount, _lastTokenPrice, msg.value, _balances[address(this)], address(this).balance, _balances[_msgSender()]);
+        _IEventHandler.emitBuyEvent(dev, address(this), tokenAmount, a, _lastTokenPrice, msg.value, _balances[address(this)], address(this).balance, _balances[_msgSender()]);
          
     }
 
+    /**
+        * @dev Bonding Curve Sell Function
+
+        * allows an actor to sell the token back to the contract.
+        * minETHAmount provides the possibility to set slippage to the user
+        * tokenAmount is used to calculate the value of tokens in ETH.
+        * the ETH sent out to the user is the amount calculated, after subtracting a 0.5% transaction fee
+        * will revert if...
+        *  - the token has already launched on a DEX
+        *  - the token balance of the user is insufficient compared to the desired sell amount
+        *  - the contracts ETH balance is less than the value of ETH to return to the user in exchange for the amount of tokens desired to sell.
+        *  - the slippage set by the user is not met.
+     */
+    
     function sell(uint256 tokenAmount, uint256 minETHAmount) external payable nonReentrant{
+        uint256 tokenPriceBefore = calcLastTokenPrice();
+
         if (isLaunched){revert TokenAlreadyLaunched();}
-        if (tokenAmount > balanceOf(_msgSender())) {revert ERC20InsufficientBalance(msg.sender, balanceOf(_msgSender()), tokenAmount);}
+        if (tokenAmount > balanceOf(_msgSender())) {revert ERC20InsufficientBalance(_msgSender(), balanceOf(_msgSender()), tokenAmount);}
         uint256 amountETH = calcETHAmount(tokenAmount);
         uint256 feeETH = amountETH * 5 / 1000;
         if (amountETH - feeETH > address(this).balance) {revert InsufficientContractETHBalance(address(this).balance, amountETH - feeETH);}
@@ -939,52 +923,66 @@ contract Token is Context, IERC20, IERC20Metadata, IERC20Errors, ReentrancyGuard
         }
         
 
-        _IEventHandler.emitSellEvent(msg.sender, address(this), tokenAmount, _lastTokenPrice, amountETH, _balances[address(this)], address(this).balance, _balances[_msgSender()]);
+        _IEventHandler.emitSellEvent(_msgSender(), address(this), tokenAmount, tokenPriceBefore, _lastTokenPrice, amountETH, _balances[address(this)], address(this).balance, _balances[_msgSender()]);
     }   
 
-
-
-// Function to calculate square root in Solidity
-  function sqrt(uint y) internal pure returns (uint z) {
-    if (y > 3) {
-        z = y;
-        uint x = y / 2 + 1;
-        while (x < z) {
-            z = x;
-            x = (y / x + x) / 2;
+    // Function to calculate square root in Solidity
+    function sqrt(uint y) internal pure returns (uint z) {
+        if (y > 3) {
+            z = y;
+            uint x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
         }
-    } else if (y != 0) {
-        z = 1;
     }
-}
 
 
-function calcTokenAmount(uint256 buyAmountETH) public view returns (uint256 tokenAmount) {
-   uint256 currentSupply = _currentSupply / (10 **18);
+    /** @dev calculates the token amount for a given ETH input
+        * each token is priced at a + (currentSupply * b)
+        * calcTokenAmount() returns the token amount to be sent to the buyer,
+        * accounting for the per-token price increase, saving gas compared to using a loop.
+    */
+    function calcTokenAmount(uint256 buyAmountETH) public view returns (uint256 tokenAmount) {
+        if(buyAmountETH == 0) {
+            return 0;
+        }
+
+        uint256 currentSupply = _currentSupply / (10 **18);
+        
+        uint256 root = ((a +b * currentSupply + b/2)**2 + 2 * b * buyAmountETH);
+        uint256 sol = sqrt(root);
+        uint256 calcAmount = (sol - a - b * currentSupply + b/2)/b;
+
+        return (calcAmount * 10 ** 18);
+    }
+
+ /** @dev calculates the ETH amount for a given token input
+        * each token is priced at a + (currentSupply * b)
+        * calcTokenAmount() returns the amount of ETH to be sent to the seller in return,
+        * accounting for the per-token price decrease, saving gas compared to using a loop.
+    */
+    function calcETHAmount(uint256 sellAmountToken) public view returns (uint256) {
+        if(sellAmountToken == 0) {
+            return 0;
+        }
+        uint256 tokensToSell = sellAmountToken / (10 ** 18); // Convert to whole tokens
+        uint256 currentSupply = _currentSupply / (10 ** 18); // Convert to whole tokens
+
+        uint256 firstTerm = a + (currentSupply - 1) * b;
+        uint256 lastTerm = a + (currentSupply - tokensToSell) * b;
+        uint256 ETHToSend = tokensToSell * (firstTerm + lastTerm) / 2;
+
+        return ETHToSend;
+    }
     
-    uint256 root = ((a +b * currentSupply + b/2)**2 + 2 * b * buyAmountETH);
-    uint256 sol = sqrt(root);
-    uint256 calcAmount = (sol - a - b * currentSupply + b/2)/b;
-
-    return (calcAmount * 10 ** 18);
-}
-
-function calcETHAmount(uint256 sellAmountToken) public view returns (uint256) {
-    uint256 tokensToSell = sellAmountToken / (10 ** 18); // Convert to whole tokens
-    uint256 currentSupply = _currentSupply / (10 ** 18); // Convert to whole tokens
-
-    uint256 firstTerm = a + (currentSupply - 1) * b;
-    uint256 lastTerm = a + (currentSupply - tokensToSell) * b;
-    uint256 ETHToSend = tokensToSell * (firstTerm + lastTerm) / 2;
-
-
-    return ETHToSend;
-}
- 
-   // Function to calculate the price of the last minted token
+    // Function to calculate the price of the last minted token
     function calcLastTokenPrice() public view returns (uint256) {
         return a + ((_currentSupply) * b);
-    }
+}
 
     receive () external payable {}
     fallback () external payable {}

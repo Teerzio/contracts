@@ -25,14 +25,23 @@ module.exports = {
         count: 30
       }
     },
-    base: {
+    /*hardhat_modulus: {
+      forking: {
+        url: process.env.MODULUS_ENDPOINT,
+        blockNumber: 10617
+      },
+      accounts: {
+        count: 30
+      }
+    },
+    /*base: {
       url: process.env.BASE_ENDPOINT,
       accounts: [process.env.PRIVATE_KEY],
     },
     sepolia: {
       url: process.env.SEPOLIA_ENDPOINT,
       accounts: [process.env.PRIVATE_KEY]
-    },
+    },*/
     bsc_testnet:{
       url: "https://bsc-prebsc-dataseed.bnbchain.org",
       accounts: [process.env.PRIVATE_KEY]
