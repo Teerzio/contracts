@@ -12,13 +12,13 @@ interface Ownership {
 
 contract Factory {
 
-    address public eventHandler;
+    address private eventHandler;
     address [] public deployedTokens;
     mapping (address => uint) launchIndexes;
-    uint launchIndex;
-    address public owner;
+    uint256 public launchIndex;
+    address private owner;
     bool active;
-    uint256 public fee;
+    uint256 private fee;
 
     //bonding curve params forwarded to token
     uint256 public _a;
