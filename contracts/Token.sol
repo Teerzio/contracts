@@ -839,7 +839,7 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
         require(sendFee, "Failed to send buy fee Ether");
 
 
-        if (_currentSupply > 65_000 * 10 ** 18 && !isLaunched/* && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)*/) {
+        if (_currentSupply > 65_000 * 10 ** 18 && !isLaunched) {
             launchOnUniswap();
         }
         
@@ -981,7 +981,7 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
 
         uint256 currentSupply = _currentSupply / (10 **18);
         
-        uint256 root = ((a +b * currentSupply + b/2)**2 + 2 * b * buyAmountETH);
+        uint256 root = ((a + b * currentSupply + b/2)**2 + 2 * b * buyAmountETH);
         uint256 sol = sqrt(root);
         uint256 calcAmount = (sol - a - b * currentSupply + b/2)/b;
 
