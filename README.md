@@ -36,7 +36,8 @@ The first token will be priced at $0.0000010005 ETH$, while the $65,000th$ token
 With the threshold for a launch on Uniswap being set to $65,000$ tokens sold, with $a = 0.000001$ and $b = 0.0000000005$, this leads to the contract having raised approx. $1.12 ETH$ being sent to the liquidity pool alongside $25,000$ tokens, leading to an intial DEX-price per token of $0.00004485 ETH$, which is slightly above the price of the last token sold on the bonding curve.
 
 
-
+### Eventhandler
+The Eventhandler contract is necessary to track all events related to the trading on the bonding curve, without the necessity to track every token on its own. Every token's buy()- and sell()- function will therefore call the Eventhandler, which will emit the corresponding event.
 
 
 
