@@ -6,9 +6,9 @@ node_modules
 # Hardhat files
 /cache
 /artifacts
-/ignition
-/test
-hardhat.config.js
+ignition
+test
+.hardhat.config.js
 
 # TypeChain files
 /typechain
