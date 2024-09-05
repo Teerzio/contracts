@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: Unlicensed (C)
 
 
+/**
+    * @dev this is the factory contract launching awesome
+
+ */
+
 pragma solidity ^0.8.19;
 
 import "./Token.sol";
@@ -12,13 +17,13 @@ interface Ownership {
 
 contract Factory {
 
-    address private eventHandler;
+    address public eventHandler;
     address [] public deployedTokens;
     mapping (address => uint) launchIndexes;
     uint256 public launchIndex;
-    address private owner;
+    address public owner;
     bool active;
-    uint256 private fee;
+    uint256 public fee;
 
     //bonding curve params forwarded to token
     uint256 public _a;
@@ -54,8 +59,8 @@ contract Factory {
 
        
        if(buyAmount > 0){
-            uint256 buyFee = buyAmount * 5 / 1000;
-            IToken(token).devBuy{value: buyAmount + buyFee }(buyAmount, msg.sender);
+            //uint256 buyFee = buyAmount * 5 / 1000;
+            IToken(token).devBuy{value: buyAmount /*+ buyFee*/ }(buyAmount, msg.sender);
         } 
     
 

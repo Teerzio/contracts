@@ -2,9 +2,13 @@ node_modules
 .env
 /key.env
 
+
 # Hardhat files
 /cache
 /artifacts
+/ignition
+/test
+hardhat.config.js
 
 # TypeChain files
 /typechain

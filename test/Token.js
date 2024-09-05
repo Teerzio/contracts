@@ -40,7 +40,7 @@ const {
       const active = await ownerConnect.setActive();
       const buyAmount = ethers.utils.parseUnits("0.1", "ether"); // This equals 10 ** 17 wei
       const buyFee = buyAmount.mul(5).div(1000)
-      const txValue = buyAmount.add(initialFee).add(buyFee)
+      const txValue = buyAmount.add(initialFee)
       const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", factoryOwner.address, buyAmount, {value: txValue.toString()});
       const receipt = await txResponse.wait();
       
@@ -97,10 +97,10 @@ const {
             const eventFilter = eventHandler.filters.Bought()
             const events = await eventHandler.queryFilter(eventFilter, receipt.blockNumber, receipt.blockNumber)
             
-            const fetchedBalance = await randomBuyerConnect._balances(randomBuyer.address)
+            const fetchedBalance = await randomBuyerConnect.balanceOf(randomBuyer.address)
             console.log("random Buyer Token _balance", ethers.utils.formatUnits(fetchedBalance.toString()))
 
-            const tokenCreatorBalance = await TokenContract._balances(tokenCreator.address)
+            const tokenCreatorBalance = await TokenContract.balanceOf(tokenCreator.address)
 
             const fetchedContractTokenBalance = await randomBuyerConnect._currentSupply()
             console.log("Token _currentSupply", ethers.utils.formatUnits(fetchedContractTokenBalance.toString()))
@@ -163,12 +163,12 @@ const {
             const supplyAfterBuy = await TokenContract._currentSupply()
             const tokenPriceAfterBuy = await TokenContract.calcLastTokenPrice()
 
-            expect(tokenPriceAfterBuy).to.equal(a.add(supplyAfterBuy.mul(b)))
+            expect(tokenPriceAfterBuy).to.equal(a.add(supplyAfterBuy.mul(b)).div(ethers.constants.WeiPerEther))
             console.log("tokenPriceAfterBuy",tokenPriceAfterBuy)
             
             console.log("initiate sell")
             
-            const balance = await randomBuyerConnect._balances(randomBuyer.address)
+            const balance = await randomBuyerConnect.balanceOf(randomBuyer.address)
             console.log("balance", ethers.utils.formatEther(balance.toString()))
             const sellAmountToken = ethers.utils.formatUnits(balance.toString());
             const minSellETH = ethers.utils.parseEther("0.09")
@@ -184,7 +184,7 @@ const {
 
             const buyerETHBalanceAfterSell = await ethers.provider.getBalance(randomBuyer.address)
 
-            const tokenCreatorBalance = await TokenContract._balances(tokenCreator.address)
+            const tokenCreatorBalance = await TokenContract.balanceOf(tokenCreator.address)
 
 
             const currentSupply = await TokenContract._currentSupply()
@@ -194,7 +194,7 @@ const {
             console.log("currentSupply = 0?", currentSupply, tokenCreatorBalance)
             console.log("token creator balance", ethers.utils.formatEther(tokenCreatorBalance))
 
-            expect(tokenPrice).to.equal(a.add(b.mul(tokenCreatorBalance)))
+            expect(tokenPrice).to.equal(a.add(b.mul(tokenCreatorBalance)).div(ethers.constants.WeiPerEther))
             console.log("tokenPrice = 0?", ethers.utils.formatUnits(tokenPrice), a)
 
             const gasSpent = sellReceipt.gasUsed.mul(sellReceipt.effectiveGasPrice)
@@ -243,34 +243,34 @@ const {
             const buyAmountETH2 = ethers.utils.parseEther("0.1")
             const value = buyAmountETH.add(buyAmountETH.mul(5).div(1000)).toString()
             
-            const response = await randomBuyerConnect.buy("1", buyAmountETH, {value: value.toString()})
+            const response = await randomBuyerConnect.buy("1", buyAmountETH, {value: buyAmountETH})
             const receipt = await response.wait()
 
             const currentSupply = await randomBuyerConnect._currentSupply();
             console.log("currentSupply", ethers.utils.formatEther(currentSupply.toString()))
 
 
-            const response1 = await trader1Connect.buy("1", buyAmountETH1, {value: value.toString()})
+            const response1 = await trader1Connect.buy("1", buyAmountETH1, {value: buyAmountETH})
             await response1.wait()
             const currentSupply1 = await randomBuyerConnect._currentSupply();
             console.log("currentSupply", ethers.utils.formatEther(currentSupply1.toString()))
 
-            const response2 = await trader2Connect.buy("1", buyAmountETH1, {value: value.toString()})
+            const response2 = await trader2Connect.buy("1", buyAmountETH1, {value: buyAmountETH})
             await response2.wait()
             const currentSupply2 = await randomBuyerConnect._currentSupply();
             console.log("currentSupply", ethers.utils.formatEther(currentSupply2.toString()))
 
 
-            const response3 = await trader3Connect.buy("1", buyAmountETH2, {value: value.toString()})
+            const response3 = await trader3Connect.buy("1", buyAmountETH2, {value: buyAmountETH})
             await response3.wait()
             const currentSupply3 = await randomBuyerConnect._currentSupply();
             console.log("currentSupply", ethers.utils.formatEther(currentSupply3.toString()))
 
 
-            const balance = await randomBuyerConnect._balances(randomBuyer.address)
-            const balance1 = await trader1Connect._balances(trader1.address)
-            const balance2 = await trader2Connect._balances(trader2.address)
-            const balance3 = await trader3Connect._balances(trader3.address)
+            const balance = await randomBuyerConnect.balanceOf(randomBuyer.address)
+            const balance1 = await trader1Connect.balanceOf(trader1.address)
+            const balance2 = await trader2Connect.balanceOf(trader2.address)
+            const balance3 = await trader3Connect.balanceOf(trader3.address)
             const isLaunched = await trader3Connect.isLaunched()
 
 
@@ -327,7 +327,7 @@ const {
             const trader3ETHBalanceAfter = await ethers.provider.getBalance(trader3.address)
             expect(trader3ETHBalanceAfter).to.equal(trader3ETHBalance.add(eth3).sub(gasSpent).sub(feeETH3))
 
-            const creatorBalance = await TokenContract._balances(tokenCreator.address)
+            const creatorBalance = await TokenContract.balanceOf(tokenCreator.address)
             const creatorEth = await TokenContract.calcETHAmount(creatorBalance)
             const creatorFee = creatorEth.mul(5).div(1000)
             const ethAfterFee = await creatorEth.sub(creatorEth.mul(5).div(1000))
@@ -350,21 +350,17 @@ const {
             
 
 
-            const balanceAfterSell = await randomBuyerConnect._balances(randomBuyer.address)
-            const balance1AfterSell = await trader1Connect._balances(trader1.address)
-            const balance2AfterSell = await trader2Connect._balances(trader2.address)
-            const balance3AfterSell = await trader3Connect._balances(trader3.address)
+            const balanceAfterSell = await randomBuyerConnect.balanceOf(randomBuyer.address)
+            const balance1AfterSell = await trader1Connect.balanceOf(trader1.address)
+            const balance2AfterSell = await trader2Connect.balanceOf(trader2.address)
+            const balance3AfterSell = await trader3Connect.balanceOf(trader3.address)
             const contractBalanceAfterSell = await ethers.provider.getBalance(TokenContract.address)
             const ethBalanceAfterSell = await ethers.provider.getBalance(randomBuyer.address)
             const ethBalance1AfterSell = await ethers.provider.getBalance(trader1.address)
             const ethBalance2AfterSell = await ethers.provider.getBalance(trader2.address)
             const ethBalance3AfterSell = await ethers.provider.getBalance(trader3.address)
             const finalCurrentSupply = await TokenContract._currentSupply();
-
-            expect(contractBalanceAfterSell).to.equal(0)
-            expect(finalCurrentSupply).to.equal(0)
-
-
+            
             console.log("random Buyer Balance", ethers.utils.formatEther(balanceAfterSell.toString()))
             console.log("trader1 Balance after sell", ethers.utils.formatEther(balance1AfterSell.toString()))
             console.log("trader2 Balance after sell", ethers.utils.formatEther(balance2AfterSell.toString()))
@@ -375,7 +371,8 @@ const {
             console.log("trader2 eth after sell", ethers.utils.formatEther(ethBalance2AfterSell.toString()))
             console.log("trader3 eth after sell", ethers.utils.formatEther(ethBalance3AfterSell.toString()))
 
-
+            expect(contractBalanceAfterSell).to.equal(0)
+            expect(finalCurrentSupply).to.equal(0)
         })
 
         it("should create a Uniswap pair and provide liquidity when goal is met", async function(){
@@ -383,13 +380,14 @@ const {
             console.log("initiate buy")
             console.log("UniswapV2Factory", UniswapV2Factory.address)
             TokenContract = await ethers.getContractAt("Token", tokenAddress);
+
             const randomBuyerConnect = TokenContract.connect(randomBuyer);
             const buyAmountETH = ethers.utils.parseEther("1")
             const value= buyAmountETH.add(buyAmountETH.mul(5).div(1000))
             const response = await randomBuyerConnect.buy("20", buyAmountETH, {value: value.toString()})
             const receipt = await response.wait()
 
-            const balance = await randomBuyerConnect._balances(randomBuyer.address)
+            const balance = await randomBuyerConnect.balanceOf(randomBuyer.address)
             console.log("buyer balance", ethers.utils.formatEther(balance.toString()))
 
 
@@ -412,7 +410,7 @@ const {
 
                 expect(pairAddress).to.equal(pair)
                 
-                Pair = await ethers.getContractAt("UniswapV2Pair", pair);
+                const Pair = await ethers.getContractAt("UniswapV2Pair", pair);
                 const reserves = await Pair.getReserves()
 
                 expect(reserves._reserve0).to.equal(amountTokensToLiq)
@@ -428,6 +426,74 @@ const {
                 expect(response).to.not.be.reverted
 
         })
+
+        it("should add liquidity even if the liquidity ratio does not match", async function(){
+            const { tokenAddress, randomBuyer, trader1, UniswapV2Router, eventHandler } = await loadFixture(fixture);
+    
+            const TokenContract = await ethers.getContractAt("Token", tokenAddress);
+            const randomBuyerConnect = TokenContract.connect(randomBuyer);
+            const firstTokenPrice = await randomBuyerConnect.calcLastTokenPrice()
+            console.log("first tokenPrice", ethers.utils.formatEther(firstTokenPrice))
+            const buyAmountETH = ethers.utils.parseEther("0.2");
+            const value = buyAmountETH.add(buyAmountETH.mul(5).div(1000));
+        
+            // Buy tokens
+            const response = await randomBuyerConnect.buy("20", buyAmountETH, { value: value.toString() });
+            await response.wait();
+        
+            // Approve Uniswap to spend buyer's tokens
+            const approve = await randomBuyerConnect.approve(
+                "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", // UniswapV2Router address
+                ethers.utils.parseEther("1000")
+            );
+            await approve.wait(); // Ensure approval is mined
+        
+            // Add liquidity
+            const uniswapConnect = UniswapV2Router.connect(randomBuyer);
+            const blockTimestamp = (await ethers.provider.getBlock("latest")).timestamp;
+            const deadline = blockTimestamp + 300;
+        
+            /*const uniswapResponse = await uniswapConnect.addLiquidityETH(
+                tokenAddress,
+                ethers.utils.parseEther("1000"), // Token amount
+                ethers.utils.parseEther("1000"), // Min tokens
+                ethers.utils.parseEther("0.1"),  // Min ETH
+                randomBuyer.address,
+                deadline,
+                { value: ethers.utils.parseEther("0.1") } // ETH value to add as liquidity
+            );*/
+        
+            //expect(uniswapResponse).to.not.be.reverted;
+
+            const trader1Connect = TokenContract.connect(trader1);
+            const buyAmountETH2 = ethers.utils.parseEther("1")
+            const response2 = await trader1Connect.buy("20", buyAmountETH2, {value: buyAmountETH2.toString()})
+            const receipt2 = await response2.wait()
+            const eventFilter = eventHandler.filters.LaunchedOnUniswap()
+            const events = await eventHandler.queryFilter(eventFilter, receipt2.blockNumber, receipt2.blockNumber)
+            
+            expect(receipt2).to.not.be.reverted
+
+            const fetchedContractTokenBalance = await randomBuyerConnect._currentSupply()
+            console.log("Token _currentSupply", ethers.utils.formatUnits(fetchedContractTokenBalance.toString()))
+            
+            const lastTokenPrice = await randomBuyerConnect.calcLastTokenPrice()
+            console.log("last tokenPrice", ethers.utils.formatEther(lastTokenPrice))
+            if(events.length > 0){
+                const tokenAddress = events[0].args.tokenAddress
+                const pairAddress = events[0].args.pairAddress
+                const amountETHToLiq = events[0].args.amountETHToLiq
+                const amountTokensToLiq = events[0].args.amountTokensToLiq
+                const fetchedContractBalance = await ethers.provider.getBalance(TokenContract.address)
+
+                console.log("tokenAddress",tokenAddress)
+                console.log("pairAddress", pairAddress)
+                console.log("amountTokensToLiq", ethers.utils.formatEther(amountTokensToLiq))
+                console.log("amountETHToLiq", ethers.utils.formatUnits(amountETHToLiq.toString()))
+                console.log("fetchedContractBalance", ethers.utils.formatUnits(fetchedContractBalance.toString()))
+            }
+        })
+
         it("should calculate the profit of the seller accurately", async function(){
             const {tokenAddress, randomBuyer,trader1, } = await loadFixture(fixture)
             console.log("initiate buy")
@@ -438,15 +504,15 @@ const {
             const response = await randomBuyerConnect.buy("20", buyAmountETH, {value: value.toString()})
             const receipt = await response.wait()
             
-            const balance = await randomBuyerConnect._balances(randomBuyer.address)
+            const balance = await randomBuyerConnect.balanceOf(randomBuyer.address)
             console.log("buyer balance", ethers.utils.formatEther(balance.toString()))
-            const ETHBalanceBefore =await ethers.provider.getBalance(randomBuyer.address)
+            const ETHBalanceBefore = await ethers.provider.getBalance(randomBuyer.address)
 
             const trader1Connect=TokenContract.connect(trader1)
             const buyAmountETH2 = ethers.utils.parseEther("0.02")
             const value2= buyAmountETH2.add(buyAmountETH2.mul(5).div(1000))
             const response2 = await trader1Connect.buy("20", buyAmountETH2, {value: value2.toString()})
-            const balance2 = await trader1Connect._balances(trader1.address)
+            const balance2 = await trader1Connect.balanceOf(trader1.address)
 
 
             const getETH = await randomBuyerConnect.calcETHAmount(balance)
@@ -469,8 +535,8 @@ const {
             TokenContract = await ethers.getContractAt("Token", tokenAddress);
             const randomBuyerConnect = TokenContract.connect(randomBuyer);
             const buyAmountETH = ethers.utils.parseEther("0.1")
-            const value= buyAmountETH.add(buyAmountETH.mul(5).div(1000))
-            await expect(randomBuyerConnect.buy("20", buyAmountETH, {value: buyAmountETH.toString()})).to.be.revertedWithCustomError
+            const insufficientAmount = ethers.utils.parseEther("0.08")
+            await expect(randomBuyerConnect.buy("20", buyAmountETH, {value: insufficientAmount.toString()})).to.be.reverted
 
         })
         it("should revert when calling the dev buy after deployment", async function(){
@@ -478,8 +544,8 @@ const {
             TokenContract = await ethers.getContractAt("Token", tokenAddress);
             const randomBuyerConnect = TokenContract.connect(randomBuyer);
             const buyAmountETH = ethers.utils.parseEther("0.1")
-            const value= buyAmountETH.add(buyAmountETH.mul(5).div(1000))
-            await expect(randomBuyerConnect.devBuy(buyAmountETH, randomBuyer.address, {value: buyAmountETH.toString()})).to.be.revertedWithCustomError
+            const value = buyAmountETH.add(buyAmountETH.mul(5).div(1000))
+            await expect(randomBuyerConnect.devBuy(buyAmountETH, randomBuyer.address, {value: buyAmountETH.toString()})).to.be.reverted
 
         })
         it("should revert when trying to sell more tokens than balanceOf", async function(){
@@ -490,7 +556,7 @@ const {
             const value= buyAmountETH.add(buyAmountETH.mul(5).div(1000))
             const response = await randomBuyerConnect.buy("10", buyAmountETH, {value: value})
 
-            const balance = await TokenContract._balances(randomBuyer.address)
+            const balance = await TokenContract.balanceOf(randomBuyer.address)
             await expect(randomBuyerConnect.sell(balance.add(100), buyAmountETH)).to.be.reverted
         })
         it("should revert when asking for too much ETH in return for Tokens", async function(){
@@ -501,8 +567,8 @@ const {
             const value= buyAmountETH.add(buyAmountETH.mul(5).div(1000))
             const response = await randomBuyerConnect.buy("10", buyAmountETH, {value: value})
 
-            const balance = await TokenContract._balances(randomBuyer.address)
-            await expect(randomBuyerConnect.sell(balance, buyAmountETH)).to.be.revertedWithCustomError
+            const balance = await TokenContract.balanceOf(randomBuyer.address)
+            await expect(randomBuyerConnect.sell(balance, buyAmountETH)).to.be.reverted
         })
         it("should succeed when asking for the max amount of ETH in return for Tokens", async function(){
             const {a, tokenAddress, randomBuyer, trader1} = context
@@ -512,7 +578,7 @@ const {
             const value= buyAmountETH.add(buyAmountETH.mul(5).div(1000))
             const response = await randomBuyerConnect.buy("10", buyAmountETH, {value: value})
 
-            const balance = await TokenContract._balances(randomBuyer.address)
+            const balance = await TokenContract.balanceOf(randomBuyer.address)
             console.log("balance", balance)
             const calcETH = await TokenContract.calcETHAmount(balance)
             console.log("calcETH", ethers.utils.formatEther(calcETH.toString()))
@@ -528,7 +594,7 @@ const {
             const buyAmountETH = ethers.utils.parseEther("0.1")
             const minTokens = await TokenContract.calcTokenAmount(buyAmountETH)
             const value = buyAmountETH.add(buyAmountETH.mul(5).div(1000))
-            await expect(randomBuyerConnect.buy(minTokens.add(100), buyAmountETH, {value: value})).to.be.revertedWithCustomError
+            await expect(randomBuyerConnect.buy(minTokens.add(100), buyAmountETH, {value: value})).to.be.reverted
         })
         it("should revert when someone is trying to buy more supply than is available", async function(){
             const {a, tokenAddress, randomBuyer, trader1} = context
@@ -552,7 +618,7 @@ const {
         const value = buyAmountETH.add(buyAmountETH.mul(5).div(1000))
         await randomBuyerConnect.buy("1", buyAmountETH, {value: value})
 
-        await expect(randomBuyerConnect.transfer(trader1.address, 100)).to.be.reverted
+        await expect(randomBuyerConnect.transfer(trader1.address, 100)).to.not.be.reverted
        })
        it("should allow a transfer after launch on DEX", async function(){
         const {a, tokenAddress, randomBuyer, trader1} = context

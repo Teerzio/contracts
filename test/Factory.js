@@ -71,7 +71,7 @@ const {
         const { params, factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
         const buyAmount = ethers.utils.parseUnits("0.1", "ether"); // This equals 10 ** 17 wei
         const buyFee = buyAmount.mul(5).div(1000)
-        const txValue = buyAmount.add(initialFee).add(buyFee)
+        const txValue = buyAmount.add(initialFee)
         const active = await ownerConnect.setActive();
         const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", factoryOwner.address, buyAmount, {value: txValue.toString()});
         const receipt = await txResponse.wait();
@@ -84,7 +84,7 @@ const {
           const tokenAddress = events[0].args.tokenAddress; // Adjust based on how your event arguments are structured
           console.log("Token address:", tokenAddress);
           TokenContract = await ethers.getContractAt("Token", tokenAddress);
-          ownerBalance = await TokenContract._balances(tokenCreator.address)
+          ownerBalance = await TokenContract.balanceOf(tokenCreator.address)
           console.log("TokenCreator balance", ownerBalance)
 
 

@@ -2,6 +2,25 @@
 
 pragma solidity ^0.8.19;
 
+/**
+
+                            created using...
+
+
+        $$\                 $$\            $$$$$$\                
+        $$ |                $$ |          $$  __$$\               
+        $$ |  $$\  $$$$$$\  $$ |  $$\     $$ /  \__|$$$$$$\$$$$\  
+        $$ | $$  |$$  __$$\ $$ | $$  |    $$$$\     $$  _$$  _$$\ 
+        $$$$$$  / $$$$$$$$ |$$$$$$  /     $$  _|    $$ / $$ / $$ |
+        $$  _$$<  $$   ____|$$  _$$<      $$ |      $$ | $$ | $$ |
+        $$ | \$$\ \$$$$$$$\ $$ | \$$\ $$\ $$ |      $$ | $$ | $$ |
+        \__|  \__| \_______|\__|  \__|\__|\__|      \__| \__| \__|
+                                                        
+
+                    cause you know what´s good, my chad!
+
+ */
+
 
 abstract contract Context {
     function _msgSender() internal view virtual returns (address) {
@@ -450,16 +469,18 @@ interface IToken {
     function sell(uint256 tokenAmount) external payable;
 }
 
+
+
 contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
     
     
-    mapping(address account => uint256) public _balances;
+    mapping(address account => uint256) private _balances;
     mapping(address account => mapping(address spender => uint256)) private _allowances;
 
     uint256 public _totalSupply; // the total supply of the token, which is 100,000
-    uint256 public _availableSupply; // the max available amount of tokens on the bonding curve, which is 75,000. 25,000 tokens are reserved for the launch on DEX
+    uint256 private _availableSupply; // the max available amount of tokens on the bonding curve, which is 75,000. 25,000 tokens are reserved for the launch on DEX
     uint256 public _currentSupply; // the amount of tokens bought by users on the bonding curve.
-    uint256 public _lastTokenPrice;
+    uint256 private _lastTokenPrice;
 
 
     string private _name;
@@ -472,11 +493,11 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
 
     bool public isLaunched;
 
-    IUniswapV2Factory public _IUniswapV2Factory;
-    IUniswapV2Router02 public _IUniswapV2Router;
-    IEventHandler public _IEventHandler;
+    IUniswapV2Factory private _IUniswapV2Factory;
+    IUniswapV2Router02 private _IUniswapV2Router;
+    IEventHandler private _IEventHandler;
 
-    address factory;
+    address private factory;
 
     error InsufficientTokenOutputAmount(uint256 tokensCalculated, uint256 tokensRequested);
     error InsufficientContractBalance(uint256 contractTokenBalance, uint256 tokensRequested);
@@ -775,6 +796,8 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
         }
     }
 
+    // BONDING CURVE FUNCTIONS
+
     /**
         * @dev Bonding Curve Buy Function
         * 
@@ -784,7 +807,7 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
         * the function will revert if...
         *  - the token has already launched through the bonding curve contract
         *  - the ETH-balance of the user is unsufficient or msg.value is insufficient
-        *  - the desired buy amount of tokens by the user exceeds the cavailabe supply
+        *  - the desired buy amount of tokens by the user exceeds the available supply
 
         * if the _currentSupply exceeds an amount of 65,000 tokens, the launchOnUniswap() will be triggered
 
@@ -793,21 +816,23 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
      **/
     function buy (uint256 minimumTokens, uint256 amountETH) external payable nonReentrant{
         uint256 tokenPriceBefore = calcLastTokenPrice();
+        uint256 feeETH = amountETH * 5 / 1000;
+        uint256 tokenAmount = calcTokenAmount(amountETH - feeETH);
+
         //checks
         if (isLaunched){revert TokenAlreadyLaunched();}
-        uint256 feeETH = amountETH * 5 / 1000;
         if (_msgSender().balance < amountETH){revert InsufficientFunds();}
         if (msg.value < amountETH){revert InsufficientValue(msg.value, amountETH + feeETH);}
-        uint256 tokenAmount = calcTokenAmount(amountETH - feeETH);
         if(_currentSupply + tokenAmount > _availableSupply) {revert InsufficientContractBalance(_availableSupply - _currentSupply, tokenAmount);}
         if(tokenAmount < minimumTokens) {revert InsufficientTokenOutputAmount(tokenAmount, minimumTokens);}
         
+        //effects
         _balances[address(this)] -= tokenAmount;
         _balances[_msgSender()] += tokenAmount;
         _currentSupply += tokenAmount;
         _lastTokenPrice = calcLastTokenPrice();
     
-        
+        // interactions
         (bool sendETH, ) = payable(address(this)).call{value: amountETH - feeETH }("");
         require(sendETH, "Failed to send buy Ether to contract");
         (bool sendFee, ) = payable(fee).call{value: feeETH}("");
@@ -823,7 +848,7 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
     }
 
     /**
-        * @dev Launch Function
+        * @dev Launch on DEX Function
 
         * will be triggered by the buy() function once the _currentSupply crosses 65,000 tokens.
         * creates the pair on Uniswap V2 and adds the amount of ETH held by the contract alongside 25,000 tokens.
@@ -837,10 +862,15 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
         _approve(address(this), address(_IUniswapV2Router), amountTokensToLiq);
         isLaunched = true;
 
-        address pair = _IUniswapV2Factory.createPair(address(this), _IUniswapV2Router.WETH());
-        _IUniswapV2Router.addLiquidityETH{value: amountETHToLiq}(address(this), amountTokensToLiq, amountTokensToLiq, amountETHToLiq, address(0), block.timestamp);
+        //address pair = _IUniswapV2Factory.createPair(address(this), _IUniswapV2Router.WETH());
+        (uint256 amountToken, uint256 amountETH, ) =_IUniswapV2Router.addLiquidityETH{value: amountETHToLiq}(address(this), amountTokensToLiq, 0, 0, address(0), block.timestamp);
+        address pair = _IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH());
 
-        _IEventHandler.emitLaunchedOnUniswap(address(this), pair, amountETHToLiq, amountTokensToLiq);
+        if(address(this).balance > 0){
+            (bool sendETH, ) = payable(address(this)).call{value: address(this).balance}("");
+            require(sendETH, "Failed to send buy Ether to contract");
+        }
+        _IEventHandler.emitLaunchedOnUniswap(address(this), pair, amountETH, amountToken);
 
     }
     /**
@@ -895,25 +925,24 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
     
     function sell(uint256 tokenAmount, uint256 minETHAmount) external payable nonReentrant{
         uint256 tokenPriceBefore = calcLastTokenPrice();
-
-        if (isLaunched){revert TokenAlreadyLaunched();}
-        if (tokenAmount > balanceOf(_msgSender())) {revert ERC20InsufficientBalance(_msgSender(), balanceOf(_msgSender()), tokenAmount);}
         uint256 amountETH = calcETHAmount(tokenAmount);
         uint256 feeETH = amountETH * 5 / 1000;
+
+        //checks
+        if (isLaunched){revert TokenAlreadyLaunched();}
+        if (tokenAmount > balanceOf(_msgSender())) {revert ERC20InsufficientBalance(_msgSender(), balanceOf(_msgSender()), tokenAmount);}
         if (amountETH - feeETH > address(this).balance) {revert InsufficientContractETHBalance(address(this).balance, amountETH - feeETH);}
         if (amountETH - feeETH < minETHAmount){revert InsufficientETHOutputAmount(amountETH - feeETH, minETHAmount);}
 
-
+        //effects
        _balances[_msgSender()] -= tokenAmount;
        _balances[address(this)] += tokenAmount;
        _currentSupply -= tokenAmount;
        _lastTokenPrice = calcLastTokenPrice();
 
-
+        //interactions
         (bool sent, ) = payable(_msgSender()).call{value: amountETH - feeETH}("");
         require(sent, "Failed to send sell Ether to contract");
-     
-        
         if (address(this).balance < feeETH){
             (bool sentFee, ) = payable(fee).call{value: address(this).balance}("");
             require(sentFee, "Failed to send remaining sell fee Ether");
@@ -939,7 +968,6 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
             z = 1;
         }
     }
-
 
     /** @dev calculates the token amount for a given ETH input
         * each token is priced at a + (currentSupply * b)
@@ -981,7 +1009,7 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
     
     // Function to calculate the price of the last minted token
     function calcLastTokenPrice() public view returns (uint256) {
-        return a + ((_currentSupply) * b);
+        return (a + ((_currentSupply) * b)) / (10 ** 18);
 }
 
     receive () external payable {}
