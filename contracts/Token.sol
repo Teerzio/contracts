@@ -883,6 +883,7 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
         //interactions
         (bool sent, ) = payable(_msgSender()).call{value: amountETH - feeETH}("");
         require(sent, "Failed to send sell Ether to contract");
+        
         if (address(this).balance < feeETH){
             (bool sentFee, ) = payable(fee).call{value: address(this).balance}("");
             require(sentFee, "Failed to send remaining sell fee Ether");
@@ -927,7 +928,7 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
         return (calcAmount * 10 ** 18);
     }
 
- /** @dev calculates the ETH amount for a given token input
+    /** @dev calculates the ETH amount for a given token input
         * each token is priced at a + (currentSupply * b)
         * calcTokenAmount() returns the amount of ETH to be sent to the seller in return,
         * accounting for the per-token price decrease, saving gas compared to using a loop.
