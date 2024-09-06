@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: Unlicensed (C)
 
 
-/**
-    * @dev this is the factory contract launching awesome
+  
+// @dev this is the factory contract which is responsible for launching the tokens tradeable on the platform
 
- */
 
 pragma solidity ^0.8.19;
 
@@ -17,13 +16,13 @@ interface Ownership {
 
 contract Factory {
 
-    address public eventHandler;
+    address public eventHandler; // handles all the events emitted by the bonding curves
     address [] public deployedTokens;
     mapping (address => uint) launchIndexes;
     uint256 public launchIndex;
     address public owner;
     bool active;
-    uint256 public fee;
+    uint256 public fee; // price for every token launch
 
     //bonding curve params forwarded to token
     uint256 public _a;
@@ -34,14 +33,23 @@ contract Factory {
         fee = fee_;
     }
 
-    error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed);
+    error InsufficientFunds(address sender, uint256 balance, uint256 needed);
 
-
+    /**
+        * @dev
+        * main function of the contract. launches a token according to owner input.
+        * also has the option to let the dev buy tokens on launch directly.
+        * will store each token address launched, update the Eventhandler to allow deployed tokens to call its functions.
+        * will renounce the ownership of each token deployed
+    
+     */
     function deployNewToken(address [] memory params, string memory name_, string memory symbol_, string memory description_, address _fee, uint256 buyAmount) external payable returns (address token){
+        //checks
         if(!active) {revert ("contract is not active yet");}
-        if(fee > msg.value) {revert ERC20InsufficientBalance(msg.sender, msg.sender.balance, fee);}
-        if(fee > msg.sender.balance) {revert ERC20InsufficientBalance(msg.sender, msg.sender.balance, fee);}
+        if(fee > msg.value) {revert InsufficientFunds(msg.sender, msg.sender.balance, fee);}
+        if(fee > msg.sender.balance) {revert InsufficientFunds(msg.sender, msg.sender.balance, fee);}
 
+        //effects
         token = address (new Token(
             params,
             name_,
@@ -52,23 +60,25 @@ contract Factory {
             _fee
         ));
 
+        // store launched token
         deployedTokens.push(address(token));
-        IEventHandler(eventHandler).updateCallers(address(token));
         ++launchIndex;
         launchIndexes[token] = launchIndex;
 
-       
-       if(buyAmount > 0){
-            //uint256 buyFee = buyAmount * 5 / 1000;
-            IToken(token).devBuy{value: buyAmount /*+ buyFee*/ }(buyAmount, msg.sender);
-        } 
-    
+        // declare deployed token as valid caller of the Eventhandler
+        IEventHandler(eventHandler).updateCallers(address(token));
 
+        // executes devbuy if amount input by dev is > 0
+        if(buyAmount > 0){
+            IToken(token).devBuy{ value: buyAmount }(buyAmount, msg.sender);
+        } 
+        
+        // sends the fee to the owner
         (bool sentFee, ) = payable(owner).call{value: fee}("");
         require(sentFee, "Failed to send Ether");
 
+    
         Ownership(token).renounceOwnership();
-
         IEventHandler(eventHandler).emitCreationEvent(msg.sender, address(token), name_, symbol_, description_);
     }
 
