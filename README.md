@@ -8,7 +8,9 @@ The Factory contract is not doing anything fancy. It´s purpose is to deploy tok
 
 ### Token
 #### General Functionality
-The Token contract uses the base of a regular ERC-20 Token with a totalSupply of $100,000$ tokens, but is modified with the Bonding Curve Functions (buy(), sell(), launchOnUniswap()). Each token can be transferred without any restriction at all times. Calling the buy()- function will transfer the calculated amount of tokens to the buyer and collect the ETH paid by the buyer. the sell()- function in reverse will just do the opposite. If the Token contract sells more than $65,000$ tokens, the launchOnUniswap() function will be triggered by the buy that pushes the sold amount above 65,000 tokens and all of the ETH collected by the Token contract will be sent to the DEX alongside $25,000$ tokens to create the trading pair. After the token has launched on a DEX, the buy()- and sell()- functions are not callable anymore.
+The Token contract uses the base of a regular ERC-20 Token with a totalSupply of $100,000$ tokens, but is modified with the Bonding Curve functions (buy(), sell(), launchOnUniswap()). The token cannot be transferred before launching on a DEX via the launchOnUniswap()- function to prevent frontrunning in providing DEX liquidity. Until then, it can only be bought and sold on the platform.
+
+Calling the buy()- function will transfer the calculated amount of tokens to the buyer and collect the ETH paid by the buyer. the sell()- function in reverse will just do the opposite. If the Token contract sells more than $65,000$ tokens, the launchOnUniswap() function will be triggered by the buy that pushes the sold amount above 65,000 tokens and all of the ETH collected by the Token contract will be sent to the DEX alongside $25,000$ tokens to create the trading pair. After the token has launched on a DEX, the buy()- and sell()- functions are not callable anymore.
 
 #### Math
 The buy()- and sell()- functions are calculating the token/ETH ratios on the buys and sells based on the price function
