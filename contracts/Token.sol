@@ -4,16 +4,22 @@ pragma solidity ^0.8.19;
 
 /**
 
-                                        created using
+                            created using...
 
-oooooooooo                                            oooo                              oooo 
- 888    888   ooooooo    oooooooo8   ooooooooo8  ooooo888 ooooooooo     ooooooo    ooooo888  
- 888oooo88    ooooo888  888ooooooo  888oooooo8 888    888  888    888   ooooo888 888    888  
- 888    888 888    888          888 888        888    888  888    888 888    888 888    888  
-o888ooo888   88ooo88 8o 88oooooo88    88oooo888  88ooo888o 888ooo88    88ooo88 8o  88ooo888o 
-                                                          o888                                                    
- 
-*/
+
+        $$\                 $$\            $$$$$$\                
+        $$ |                $$ |          $$  __$$\               
+        $$ |  $$\  $$$$$$\  $$ |  $$\     $$ /  \__|$$$$$$\$$$$\  
+        $$ | $$  |$$  __$$\ $$ | $$  |    $$$$\     $$  _$$  _$$\ 
+        $$$$$$  / $$$$$$$$ |$$$$$$  /     $$  _|    $$ / $$ / $$ |
+        $$  _$$<  $$   ____|$$  _$$<      $$ |      $$ | $$ | $$ |
+        $$ | \$$\ \$$$$$$$\ $$ | \$$\ $$\ $$ |      $$ | $$ | $$ |
+        \__|  \__| \_______|\__|  \__|\__|\__|      \__| \__| \__|
+                                                        
+
+                    cause you know what´s good, my chad!
+
+ */
 
 
 abstract contract Context {
@@ -883,7 +889,7 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
         //interactions
         (bool sent, ) = payable(_msgSender()).call{value: amountETH - feeETH}("");
         require(sent, "Failed to send sell Ether to contract");
-        
+
         if (address(this).balance < feeETH){
             (bool sentFee, ) = payable(fee).call{value: address(this).balance}("");
             require(sentFee, "Failed to send remaining sell fee Ether");
