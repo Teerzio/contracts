@@ -3,22 +3,14 @@
 pragma solidity ^0.8.19;
 
 /**
+                                        created using
 
-                            created using...
-
-
-        $$\                 $$\            $$$$$$\                
-        $$ |                $$ |          $$  __$$\               
-        $$ |  $$\  $$$$$$\  $$ |  $$\     $$ /  \__|$$$$$$\$$$$\  
-        $$ | $$  |$$  __$$\ $$ | $$  |    $$$$\     $$  _$$  _$$\ 
-        $$$$$$  / $$$$$$$$ |$$$$$$  /     $$  _|    $$ / $$ / $$ |
-        $$  _$$<  $$   ____|$$  _$$<      $$ |      $$ | $$ | $$ |
-        $$ | \$$\ \$$$$$$$\ $$ | \$$\ $$\ $$ |      $$ | $$ | $$ |
-        \__|  \__| \_______|\__|  \__|\__|\__|      \__| \__| \__|
-                                                        
-
-                    cause you know what´s good, my chad!
-
+oooooooooo                                            oooo                              oooo 
+ 888    888   ooooooo    oooooooo8   ooooooooo8  ooooo888 ooooooooo     ooooooo    ooooo888  
+ 888oooo88    ooooo888  888ooooooo  888oooooo8 888    888  888    888   ooooo888 888    888  
+ 888    888 888    888          888 888        888    888  888    888 888    888 888    888  
+o888ooo888   88ooo88 8o 88oooooo88    88oooo888  88ooo888o 888ooo88    88ooo88 8o  88ooo888o 
+                                                          o888                                                    
  */
 
 
@@ -473,7 +465,8 @@ interface IToken {
 
 contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
     
-    
+    bool public isLaunched;
+
     mapping(address account => uint256) private _balances;
     mapping(address account => mapping(address spender => uint256)) private _allowances;
 
@@ -490,8 +483,6 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
     uint256 private a;
     uint256 private b;
     address private fee; //address to receive the trading fees
-
-    bool public isLaunched;
 
     IUniswapV2Factory private _IUniswapV2Factory;
     IUniswapV2Router02 private _IUniswapV2Router;
@@ -530,7 +521,6 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
         _availableSupply = 75_000 * 10 ** 18;
         _balances[address(this)] = _totalSupply;
         fee = _fee;
-        _currentSupply = 0;
     }
 
     /**
@@ -667,6 +657,9 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
      * Emits a {Transfer} event.
      */
     function _update(address from, address to, uint256 value) internal virtual {
+        if(!isLaunched){
+            revert TokenNotLaunched();
+        }
         if (from == address(0)) {
             // Overflow check required: The rest of the code assumes that totalSupply never overflows
             _totalSupply += value; 
@@ -686,7 +679,8 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
                 // Overflow not possible: value <= totalSupply or value <= fromBalance <= totalSupply.
                 _totalSupply -= value;
             }
-        } else {
+        } 
+        else {
             unchecked {
                 // Overflow not possible: balance + value is at most totalSupply, which we know fits into a uint256.
                 _balances[to] += value;
@@ -805,12 +799,10 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
         * minimumTokens provides the possibility to set slippage to the user.
         * amountETH is used to calculate the amount of tokens to buy after deducting a transaction fee of 0.5% on amountETH.
         * the function will revert if...
-        *  - the token has already launched through the bonding curve contract
-        *  - the ETH-balance of the user is unsufficient or msg.value is insufficient
+        *  - the token has already launched via launchOnUniswap()
+        *  - the ETH-balance of the user is insufficient or msg.value is insufficient
         *  - the desired buy amount of tokens by the user exceeds the available supply
-
         * if the _currentSupply exceeds an amount of 65,000 tokens, the launchOnUniswap() will be triggered
-
         * the function calls the eventHandler contract to emit a buy event for this particular token.
 
      **/
@@ -856,52 +848,49 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
 
      **/
     function launchOnUniswap() internal{
-        uint256 amountETHToLiq = address(this).balance;
-        uint256 amountTokensToLiq = 25_000 * 10 ** 18;
-
-        _approve(address(this), address(_IUniswapV2Router), amountTokensToLiq);
+        _approve(address(this), address(_IUniswapV2Router), 25000*10**18);
         isLaunched = true;
 
-        //address pair = _IUniswapV2Factory.createPair(address(this), _IUniswapV2Router.WETH());
-        (uint256 amountToken, uint256 amountETH, ) =_IUniswapV2Router.addLiquidityETH{value: amountETHToLiq}(address(this), amountTokensToLiq, 0, 0, address(0), block.timestamp);
+        (uint256 amountToken, uint256 amountETH, ) =_IUniswapV2Router.addLiquidityETH{value: address(this).balance}(address(this), 25_000*10**18, 0, 0, address(0), block.timestamp);
         address pair = _IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH());
 
         if(address(this).balance > 0){
-            (bool sendETH, ) = payable(address(this)).call{value: address(this).balance}("");
+            (bool sendETH, ) = payable(fee).call{value: address(this).balance}("");
             require(sendETH, "Failed to send buy Ether to contract");
         }
         _IEventHandler.emitLaunchedOnUniswap(address(this), pair, amountETH, amountToken);
 
     }
     /**
-        @dev Dev Buy Function to allow dev to buy tokens on creation.
+        @dev Dev Buy Function to allow dev to buy tokens when creating it.
         * will be triggered by the factory when the token is created, should the dev enter a buy amount upon creation.
         * can only be called by the factory in the function call which creates the contract.
      */
     
-    function devBuy (uint256 amountETH, address dev) external payable nonReentrant{
-        if(_msgSender() != factory){revert OnlyFactory();}
+    function devBuy (uint256 amountETH, address dev) external payable nonReentrant{        
+        uint256 feeETH = amountETH * 5 / 1000;
+        uint256 tokenAmount = calcTokenAmount(amountETH - feeETH);
 
         //checks
-        uint256 feeETH = amountETH * 5 / 1000;
+        if(_msgSender() != factory){revert OnlyFactory();}
         if (dev.balance < amountETH){revert InsufficientFunds();}
         if (msg.value < amountETH){revert InsufficientValue(msg.value, amountETH);}
-        uint256 tokenAmount = calcTokenAmount(amountETH - feeETH);
         if(_totalSupply - _balances[address(this)] + tokenAmount > _availableSupply) {revert InsufficientContractBalance(_availableSupply - _balances[address(this)], tokenAmount);}
         
+        //effects
         _balances[address(this)] -= tokenAmount;
         _balances[dev] += tokenAmount;
         _currentSupply += tokenAmount;
         _lastTokenPrice = calcLastTokenPrice();
     
-        
+        //interactions
         (bool sendETH, ) = payable(address(this)).call{value: amountETH - feeETH}("");
         require(sendETH, "Failed to send buy Ether to contract");
         (bool sendFee, ) = payable(fee).call{value: feeETH}("");
         require(sendFee, "Failed to send buy fee Ether");
 
 
-        if (_currentSupply > 65_000 * 10 ** 18 && !isLaunched/* && address(_IUniswapV2Factory.getPair(address(this), _IUniswapV2Router.WETH())) == address(0)*/) {
+        if (_currentSupply > 65_000 * 10 ** 18 && !isLaunched) {
             launchOnUniswap();
         }
         
