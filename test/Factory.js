@@ -156,6 +156,14 @@ const {
         await expect(tokenCreatorConnect.setFix(ethers.utils.parseUnits("0.000001", "ether"))).to.be.revertedWith("only the owner can call this function")
         await expect(tokenCreatorConnect.setMultiplicator(ethers.utils.parseUnits("0.000001", "ether"))).to.be.revertedWith("only the owner can call this function")
       })
+      it("should successfully set the eventhandler if it is a contract", async function(){
+        const { factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
+        await expect(ownerConnect.setEventHandler(eventHandler.address)).to.not.be.reverted
+      })
+      it("should revert if the eventhandler is not a contract", async function(){
+        const { factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
+        await expect(ownerConnect.setEventHandler(factoryOwner.address)).to.be.revertedWith("eventHandler must be a contract")
+      })
     }) 
   })
 

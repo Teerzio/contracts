@@ -5,7 +5,7 @@
 // @dev this is the factory contract which is responsible for launching the tokens tradeable on the platform
 
 
-pragma solidity ^0.8.19;
+pragma solidity 0.8.19;
 
 import "./Token.sol";
 import "./EventHandler.sol";
@@ -18,15 +18,24 @@ contract Factory {
 
     address public eventHandler; // handles all the events emitted by the bonding curves
     address [] public deployedTokens;
-    mapping (address => uint) launchIndexes;
+    mapping (address => uint) public launchIndexes;
     uint256 public launchIndex;
     address public owner;
-    bool active;
+    bool public active;
     uint256 public fee; // price for every token launch
 
     //bonding curve params forwarded to token
     uint256 public _fix;
     uint256 public _multiplicator;
+
+
+    event OwnerChange(address oldOwner, address newOwner, uint256 timestamp);
+    event UpdateEventHandler(address newEventHandler, uint256 timestamp);
+    event UpdateFix(uint256 newFix, uint256 timestamp);
+    event UpdateMultiplicator(uint256 newMultiplicator, uint256 timestamp);
+    event UpdateActive(bool active, uint256 timestamp);
+
+
 
     constructor (uint256 fee_) {
         owner = msg.sender;
@@ -85,34 +94,57 @@ contract Factory {
     function changeOwner(address _owner) external {
         require(msg.sender == owner, "only the owner can call this function");
         owner = _owner;
+
+        emit OwnerChange(msg.sender, _owner, block.timestamp);
     }
 
     function setEventHandler(address eventHandler_) external {
         require(msg.sender == owner, "only the owner can call this function");
+        bool isContract = checkContract(eventHandler_);
+        require(isContract, "eventHandler must be a contract");
         eventHandler = eventHandler_;
+
+        emit UpdateEventHandler(eventHandler_, block.timestamp);
+
     }
 
     function setActive() external {
         require(msg.sender == owner, "only the owner can call this function");
         active = true;
+
+        emit UpdateActive(true, block.timestamp);
     }
 
     function setInactive() external {
-         require(msg.sender == owner, "only the owner can call this function");
+        require(msg.sender == owner, "only the owner can call this function");
         active = false;
+
+        emit UpdateActive(false, block.timestamp);
+
     }
 
     function setFix (uint256 fix) external {
         require(msg.sender == owner, "only the owner can call this function");
         _fix = fix;
+
+        emit UpdateFix(fix, block.timestamp);
     }
 
     function setMultiplicator (uint256 multiplicator) external {
         require(msg.sender == owner, "only the owner can call this function");
         _multiplicator = multiplicator;
+
+        emit UpdateMultiplicator(multiplicator, block.timestamp);
     }
 
+    function checkContract(address account) public view returns (bool) {
+        uint256 size;
 
+        assembly {
+            size := extcodesize(account)
+        }
+        return size > 0;
+    }
 
 
 

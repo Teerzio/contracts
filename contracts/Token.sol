@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicensed (C)
 
-pragma solidity ^0.8.19;
+pragma solidity 0.8.19;
 
 /**
 
