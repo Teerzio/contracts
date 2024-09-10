@@ -16,26 +16,26 @@ Calling the buy()- function will transfer the calculated amount of tokens to the
 The buy()- and sell()- functions are calculating the token/ETH ratios on the buys and sells based on the price function
 
 ```math 
-     p = a + (currentSupply * b)
+     p = fix + (currentSupply * multiplicator)
 ```
 
 
 Accordingly, to calculate the amount of tokens a user gets in return for a given amount of ETH while taking a price increase per token into account, the formula below is used:
 
 ```math
-\text{tokenAmount} = \frac{\sqrt{\left(\frac{a + b \cdot \text{currentSupply} + \frac{b}{2}}{b}\right)^2 + 2 \cdot b \cdot \text{buyAmountETH}} - a - b \cdot \text{currentSupply} + \frac{b}{2}}{b}
+\text{tokenAmount} = \frac{\sqrt{\left(\frac{fix + multiplicator \cdot \text{currentSupply} + \frac{multiplicator}{2}}{multiplicator}\right)^2 + 2 \cdot multiplicator \cdot \text{buyAmountETH}} - fix - multiplicator \cdot \text{currentSupply} + \frac{multiplicator}{2}}{multiplicator}
 ```
 
 
 In reverse, to calculate the amount of ETH a user will get, the following formula is used:
 
 ```math
-\text{ETHAmount} = \text{sellAmountToken} \cdot \left( \left( a + ( \text{currentSupply} - 1 ) \cdot b \right) \cdot \left( a + ( \text{currentSupply} - \text{sellAmountToken} ) \cdot b \right) \right)
+\text{ETHAmount} = \text{sellAmountToken} \cdot \left( \left( fix + ( \text{currentSupply} - 1 ) \cdot multiplicator \right) \cdot \left( fix + ( \text{currentSupply} - \text{sellAmountToken} ) \cdot multiplicator \right) \right)
 ```
 
 The first token will be priced at $0.0000010005 ETH$, while the $65,000th$ token (last token sold before launching on DEX) is priced at $0.0000335 ETH$, meaning roughly a 33x from deployment to launch on Uniswap.
 
-With the threshold for a launch on Uniswap being set to $65,000$ tokens sold, with $a = 0.000001$ and $b = 0.0000000005$, this leads to the contract having raised approx. $1.12 ETH$ being sent to the liquidity pool alongside $25,000$ tokens, leading to an intial DEX-price per token of $0.00004485 ETH$, which is slightly above the price of the last token sold on the bonding curve.
+With the threshold for a launch on Uniswap being set to $65,000$ tokens sold, with $fix = 0.000001$ and $multiplicator = 0.0000000005$, this leads to the contract having raised approx. $1.12 ETH$ being sent to the liquidity pool alongside $25,000$ tokens, leading to an intial DEX-price per token of $0.00004485 ETH$, which is slightly above the price of the last token sold on the bonding curve.
 
 
 ### Eventhandler
