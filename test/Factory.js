@@ -52,12 +52,20 @@ const {
         expect(initialFee.toString()).to.equal(creatorFee.toString());
         
       });
-      it("should set the a and b values correctly", async function(){
+      it("should set the fix and multiplicator values correctly", async function(){
         const { factory, a, b } = await loadFixture(fixture);
         const aContract = await factory._fix();
         const bContract = await factory._multiplicator();
         expect(a.toString()).to.equal(aContract.toString());
         expect(b.toString()).to.equal(bContract.toString());
+      });
+      it("should revert when setting fix to 0", async function(){
+        const { factory} = await loadFixture(fixture);
+        await expect(factory.setFix("0")).to.be.revertedWith("fix has to be above 0");
+      });
+      it("should revert when setting multiplicator to 0", async function(){
+        const { factory} = await loadFixture(fixture);
+        await expect(factory.setMultiplicator("0")).to.be.revertedWith("multiplicator has to be above 0");
       });
     });
 

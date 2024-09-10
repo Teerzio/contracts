@@ -124,6 +124,7 @@ contract Factory {
     }
 
     function setFix (uint256 fix) external {
+        require(fix > 0, "fix has to be above 0");
         require(msg.sender == owner, "only the owner can call this function");
         _fix = fix;
 
@@ -131,6 +132,7 @@ contract Factory {
     }
 
     function setMultiplicator (uint256 multiplicator) external {
+        require(multiplicator > 0, "multiplicator has to be above 0");
         require(msg.sender == owner, "only the owner can call this function");
         _multiplicator = multiplicator;
 
