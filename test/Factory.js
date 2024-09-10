@@ -20,8 +20,8 @@ const {
       const factory = await Factory.deploy(initialFee);
       const ownerConnect = factory.connect(factoryOwner);
       const tokenCreatorConnect = factory.connect(tokenCreator);
-      const setA = await ownerConnect.setA(a);
-      const setB = await ownerConnect.setB(b)
+      const setFix = await ownerConnect.setFix(a);
+      const setMultiplicator = await ownerConnect.setMultiplicator(b)
 
       // deploy eventhandler
       const EventHandler = await ethers.getContractFactory("EventHandler");
@@ -54,8 +54,8 @@ const {
       });
       it("should set the a and b values correctly", async function(){
         const { factory, a, b } = await loadFixture(fixture);
-        const aContract = await factory._a();
-        const bContract = await factory._b();
+        const aContract = await factory._fix();
+        const bContract = await factory._multiplicator();
         expect(a.toString()).to.equal(aContract.toString());
         expect(b.toString()).to.equal(bContract.toString());
       });
@@ -153,8 +153,8 @@ const {
         const { factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
         await expect(tokenCreatorConnect.changeOwner("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")).to.be.revertedWith("only the owner can call this function")
         await expect(tokenCreatorConnect.setActive()).to.be.revertedWith("only the owner can call this function")
-        await expect(tokenCreatorConnect.setA(ethers.utils.parseUnits("0.000001", "ether"))).to.be.revertedWith("only the owner can call this function")
-        await expect(tokenCreatorConnect.setB(ethers.utils.parseUnits("0.000001", "ether"))).to.be.revertedWith("only the owner can call this function")
+        await expect(tokenCreatorConnect.setFix(ethers.utils.parseUnits("0.000001", "ether"))).to.be.revertedWith("only the owner can call this function")
+        await expect(tokenCreatorConnect.setMultiplicator(ethers.utils.parseUnits("0.000001", "ether"))).to.be.revertedWith("only the owner can call this function")
       })
     }) 
   })

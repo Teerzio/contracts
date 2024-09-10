@@ -25,8 +25,8 @@ contract Factory {
     uint256 public fee; // price for every token launch
 
     //bonding curve params forwarded to token
-    uint256 public _a;
-    uint256 public _b;
+    uint256 public _fix;
+    uint256 public _multiplicator;
 
     constructor (uint256 fee_) {
         owner = msg.sender;
@@ -55,8 +55,8 @@ contract Factory {
             name_,
             symbol_,
             description_,
-            _a,
-            _b,
+            _fix,
+            _multiplicator,
             _fee
         ));
 
@@ -102,14 +102,14 @@ contract Factory {
         active = false;
     }
 
-    function setA (uint256 a) external {
+    function setFix (uint256 fix) external {
         require(msg.sender == owner, "only the owner can call this function");
-        _a = a;
+        _fix = fix;
     }
 
-    function setB (uint256 b) external {
+    function setMultiplicator (uint256 multiplicator) external {
         require(msg.sender == owner, "only the owner can call this function");
-        _b = b;
+        _multiplicator = multiplicator;
     }
 
 

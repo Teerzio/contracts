@@ -437,8 +437,8 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
     string private _symbol;
     string private _description;
     
-    uint256 private a;
-    uint256 private b;
+    uint256 private fix;
+    uint256 private multiplicator;
     address private fee; //address to receive the trading fees
 
     IUniswapV2Factory private _IUniswapV2Factory;
@@ -464,7 +464,7 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(address [] memory params, string memory name_, string memory symbol_, string memory description_, uint256 _a, uint256 _b, address _fee) {
+    constructor(address [] memory params, string memory name_, string memory symbol_, string memory description_, uint256 _fix, uint256 _multiplicator, address _fee) {
         _IEventHandler = IEventHandler(params[0]);
         _IUniswapV2Factory = IUniswapV2Factory(params[1]);
         _IUniswapV2Router = IUniswapV2Router02(params[2]);
@@ -472,8 +472,8 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
         _name = name_;
         _symbol = symbol_;
         _description = description_;
-        a = _a;
-        b = _b;
+        fix = _fix;
+        multiplicator = _multiplicator;
         _totalSupply = 100_000 * 10 ** 18;
         _availableSupply = 75_000 * 10 ** 18;
         _balances[address(this)] = _totalSupply;
@@ -851,7 +851,7 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
             launchOnUniswap();
         }
         
-        _IEventHandler.emitBuyEvent(dev, address(this), tokenAmount, a, _lastTokenPrice, msg.value, _balances[address(this)], _balances[_msgSender()]);
+        _IEventHandler.emitBuyEvent(dev, address(this), tokenAmount, fix, _lastTokenPrice, msg.value, _balances[address(this)], _balances[_msgSender()]);
          
     }
 
@@ -927,9 +927,9 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
 
         uint256 currentSupply = _currentSupply / (10 **18);
         
-        uint256 root = ((a + b * currentSupply + b/2)**2 + 2 * b * buyAmountETH);
+        uint256 root = ((fix + multiplicator * currentSupply + multiplicator/2)**2 + 2 * multiplicator * buyAmountETH);
         uint256 sol = sqrt(root);
-        uint256 calcAmount = (sol - a - b * currentSupply + b/2)/b;
+        uint256 calcAmount = (sol - fix - multiplicator * currentSupply + multiplicator/2)/multiplicator;
 
         return (calcAmount * 10 ** 18);
     }
@@ -946,8 +946,8 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
         uint256 tokensToSell = sellAmountToken / (10 ** 18); // Convert to whole tokens
         uint256 currentSupply = _currentSupply / (10 ** 18); // Convert to whole tokens
 
-        uint256 firstTerm = a + (currentSupply - 1) * b;
-        uint256 lastTerm = a + (currentSupply - tokensToSell) * b;
+        uint256 firstTerm = fix + (currentSupply - 1) * multiplicator;
+        uint256 lastTerm = fix + (currentSupply - tokensToSell) * multiplicator;
         uint256 ETHToSend = tokensToSell * (firstTerm + lastTerm) / 2;
 
         return ETHToSend;
@@ -955,7 +955,7 @@ contract Token is Context, IERC20, IERC20Errors, ReentrancyGuard, Ownable {
     
     // Function to calculate the price of the last minted token
     function calcLastTokenPrice() public view returns (uint256) {
-        return (a + ((_currentSupply) * b)) / (10 ** 18);
+        return (fix + ((_currentSupply) * multiplicator)) / (10 ** 18);
 }
 
     receive () external payable {}

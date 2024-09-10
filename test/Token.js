@@ -22,8 +22,8 @@ const {
       const factory = await Factory.deploy(initialFee);
       const ownerConnect = factory.connect(factoryOwner);
       const tokenCreatorConnect = factory.connect(tokenCreator);
-      const setA = await ownerConnect.setA(a);
-      const setB = await ownerConnect.setB(b)
+      const setA = await ownerConnect.setFix(a);
+      const setB = await ownerConnect.setMultiplicator(b)
       
       // deploy and set up EventHandler
       const EventHandler = await ethers.getContractFactory("EventHandler");
