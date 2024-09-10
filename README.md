@@ -1,4 +1,4 @@
-# Basedpad
+# kek.fm
 ## Premise
 The protocol is designed to allow permissionless launches of tokens by users. These tokens are then tradeable on the platform. After a certain threshold is reached, the token automatically launches on a DEX.
 
