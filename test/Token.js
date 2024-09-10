@@ -410,18 +410,17 @@ const {
         it("should succeed when asking for the max amount of ETH in return for Tokens", async function(){
             const {a, tokenAddress, randomBuyer, trader1} = context
             TokenContract = await ethers.getContractAt("Token", tokenAddress);
+
+            // initiate buy
             const randomBuyerConnect = TokenContract.connect(randomBuyer);
             const buyAmountETH = ethers.utils.parseEther("0.01")
             const response = await randomBuyerConnect.buy("10", buyAmountETH, {value: buyAmountETH})
 
+            // calculate max ETH to be receivable
             const balance = await TokenContract.balanceOf(randomBuyer.address)
-            console.log("balance", balance)
             const calcETH = await TokenContract.calcETHAmount(balance)
-            console.log("calcETH", ethers.utils.formatEther(calcETH.toString()))
             const ETHAfterFee = calcETH.sub((calcETH.mul(5).div(1000)))
-            console.log("eth after fee", ethers.utils.formatUnits(ETHAfterFee.toString()))
-            //const sellTx = await randomBuyerConnect.sell(balance, ETHAfterFee)
-            //await expect(sellTx).to.not.be.reverted
+            
             await expect(randomBuyerConnect.sell(balance, ETHAfterFee)).to.not.be.reverted
 
         })
@@ -431,8 +430,7 @@ const {
             const randomBuyerConnect = TokenContract.connect(randomBuyer);
             const buyAmountETH = ethers.utils.parseEther("0.1")
             const minTokens = await TokenContract.calcTokenAmount(buyAmountETH)
-            const value = buyAmountETH.add(buyAmountETH.mul(5).div(1000))
-            await expect(randomBuyerConnect.buy(minTokens.add(100), buyAmountETH, {value: value})).to.be.reverted
+            await expect(randomBuyerConnect.buy(minTokens.add(100), buyAmountETH, {value: buyAmountETH})).to.be.reverted
         })
         it("should revert when someone is trying to buy more supply than is available", async function(){
             const {a, tokenAddress, randomBuyer, trader1} = context
@@ -440,21 +438,18 @@ const {
 
             const randomBuyerConnect = TokenContract.connect(randomBuyer);
             const buyAmountETH = ethers.utils.parseEther("2")
-            const value= buyAmountETH.add(buyAmountETH.mul(5).div(1000))
-            await expect(randomBuyerConnect.buy("10", buyAmountETH, {value: value})).to.be.reverted
-
+            await expect(randomBuyerConnect.buy("10", buyAmountETH, {value: buyAmountETH})).to.be.reverted
         })
 
     })
 
-    describe("Presale vs DEX Trading functions", function(){
+    describe("Platform Trading vs DEX Trading functions", function(){
        it("should prohibit a transfer before launch on DEX", async function(){
         const {a, tokenAddress, randomBuyer, trader1} = context
         TokenContract = await ethers.getContractAt("Token", tokenAddress);
         const randomBuyerConnect = TokenContract.connect(randomBuyer);
         const buyAmountETH = ethers.utils.parseEther("0.1")
-        const value = buyAmountETH.add(buyAmountETH.mul(5).div(1000))
-        await randomBuyerConnect.buy("1", buyAmountETH, {value: value})
+        await randomBuyerConnect.buy("1", buyAmountETH, {value: buyAmountETH})
 
         await expect(randomBuyerConnect.transfer(trader1.address, 100)).to.be.reverted
        })
@@ -473,10 +468,8 @@ const {
         TokenContract = await ethers.getContractAt("Token", tokenAddress);
         const randomBuyerConnect = TokenContract.connect(randomBuyer);
         const buyAmountETH = ethers.utils.parseEther("0.9")
-        const value = buyAmountETH.add(buyAmountETH.mul(5).div(1000))
-        await randomBuyerConnect.buy("1", buyAmountETH, {value: value})
-
-        await expect(randomBuyerConnect.buy("1", buyAmountETH, {value: value})).to.be.reverted
+        await randomBuyerConnect.buy("1", buyAmountETH, {value: buyAmountETH})
+        await expect(randomBuyerConnect.buy("1", buyAmountETH, {value: buyAmountETH})).to.be.reverted
         await expect(randomBuyerConnect.sell("1", "1")).to.be.reverted
        })
       
