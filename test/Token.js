@@ -1,6 +1,7 @@
 const {
     time,
     loadFixture,
+    helpers
   } = require("@nomicfoundation/hardhat-network-helpers");
   const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
   const { expect } = require("chai");
@@ -480,8 +481,145 @@ const {
         console.log("owner", owner)
 
         expect(owner).to.equal("0x0000000000000000000000000000000000000000")
-
         })
+
+        it("should allow for buying on DEX after the trading pair is created", async function(){
+            const {tokenAddress, randomBuyer, eventHandler, UniswapV2Factory, UniswapV2Router} = await loadFixture(fixture)
+            TokenContract = await ethers.getContractAt("Token", tokenAddress);
+
+            // initiate the buy that pushes the contracts supply above the launchOnUniswap()- threshold
+            const randomBuyerConnect = TokenContract.connect(randomBuyer);
+            const buyAmountETH = ethers.utils.parseEther("1.2")
+            const response = await randomBuyerConnect.buy("20", buyAmountETH, {value: buyAmountETH})
+            const receipt = await response.wait()
+
+            // check if the token launched on Uniswap
+            const eventFilter = eventHandler.filters.LaunchedOnUniswap()
+            const events = await eventHandler.queryFilter(eventFilter, receipt.blockNumber, receipt.blockNumber)
+
+            // make test fail if event is not emitted
+            expect(events.length).to.be.above(0)
+            
+            if(events.length > 0){
+                const tokenAddress = events[0].args.tokenAddress
+                const pairAddress = events[0].args.pairAddress
+                const amountETHToLiq = events[0].args.amountETHToLiq
+                const amountTokensToLiq = events[0].args.amountTokensToLiq
+
+                //check if the pair address in the event is the same as on uniswap
+                const weth = await UniswapV2Router.WETH();
+                const pair = await UniswapV2Factory.getPair(tokenAddress, weth)
+                expect(pairAddress).to.equal(pair)
+                
+
+                Pair = await ethers.getContractAt("UniswapV2Pair", pair);
+                //define swap params
+                const pathSell = [tokenAddress, weth]
+                const pathBuy = [weth,tokenAddress]
+                const deadline = await time.latest() + 1000000
+
+                //get reserves before swap
+                const reserves = await Pair.getReserves()
+                const reserve0Before = ethers.utils.formatEther(reserves._reserve0.toString())
+                const reserve1Before = ethers.utils.formatEther(reserves._reserve1.toString())
+                console.log("reserve0Before", reserve0Before)
+                console.log("reserve1Before", reserve1Before)
+
+
+                //approve tokens for swap
+                const approveAmount = ethers.utils.parseEther("20000")
+                const ethAmount = ethers.utils.parseEther("0.1")
+                const approval = await Pair.connect(randomBuyer).approve(pairAddress, approveAmount)
+
+                await expect(UniswapV2Router.connect(randomBuyer).swapExactETHForTokensSupportingFeeOnTransferTokens(0, pathBuy, randomBuyer.address, deadline, {value: ethAmount})).to.not.be.reverted
+                
+                //get reserves after the buy
+                const reservesAfter = await Pair.getReserves()
+                const reserve0After = ethers.utils.formatEther(reservesAfter._reserve0.toString())
+                const reserve1After = ethers.utils.formatEther(reservesAfter._reserve1.toString())
+                console.log("reserve0After", reserve0After)
+                console.log("reserve1After", reserve1After)
+                
+                //console.log("tokenAddress",tokenAddress)
+                //console.log("pairAddress", pairAddress)
+                //console.log("amountTokensToLiq", ethers.utils.formatEther(amountTokensToLiq.toString()))
+                //console.log("amountETHToLiq", ethers.utils.formatUnits(amountETHToLiq.toString()))
+                //console.log("fetchedContractBalance", ethers.utils.formatUnits(fetchedContractBalance.toString()))
+                
+            }
+        })
+        it("should allow for selling on DEX after the trading pair is created", async function(){
+            const {tokenAddress, randomBuyer, trader1, eventHandler, UniswapV2Factory, UniswapV2Router} = await loadFixture(fixture)
+            TokenContract = await ethers.getContractAt("Token", tokenAddress);
+
+            // initiate the buy that pushes the contracts supply above the launchOnUniswap()- threshold
+            const randomBuyerConnect = TokenContract.connect(randomBuyer);
+            const buyAmountETH = ethers.utils.parseEther("1.2")
+            const response = await randomBuyerConnect.buy("20", buyAmountETH, {value: buyAmountETH})
+            const receipt = await response.wait()
+            
+
+            // check if the token launched on Uniswap
+            const eventFilter = eventHandler.filters.LaunchedOnUniswap()
+            const events = await eventHandler.queryFilter(eventFilter, receipt.blockNumber, receipt.blockNumber)
+
+            // make test fail if event is not emitted
+            expect(events.length).to.be.above(0)
+            
+            if(events.length > 0){
+
+                const tokenAddress = events[0].args.tokenAddress
+                const pairAddress = events[0].args.pairAddress
+                const amountETHToLiq = events[0].args.amountETHToLiq
+                const amountTokensToLiq = events[0].args.amountTokensToLiq
+
+                //check if the pair address in the event is the same as on uniswap
+                const weth = await UniswapV2Router.WETH();
+                const pair = await UniswapV2Factory.getPair(tokenAddress, weth)
+                expect(pairAddress).to.equal(pair)
+                
+
+                Pair = await ethers.getContractAt("UniswapV2Pair", pair);
+                //define swap params
+                const pathSell = [tokenAddress, weth]
+                const pathBuy = [weth,tokenAddress]
+                const deadline = await time.latest() + 1000000
+                
+                //initiate a buy before the sell to check the profit of randombuyer
+                const ethAmount = ethers.utils.parseEther("0.5")
+                await expect(UniswapV2Router.connect(trader1).swapExactETHForTokensSupportingFeeOnTransferTokens(0, pathBuy, randomBuyer.address, deadline, {value: ethAmount})).to.not.be.reverted
+
+                //get reserves before the sell
+                const reserves = await Pair.getReserves()
+                const reserve0Before = ethers.utils.formatEther(reserves._reserve0.toString())
+                const reserve1Before = ethers.utils.formatEther(reserves._reserve1.toString())
+                console.log("reserve0Before", reserve0Before)
+                console.log("reserve1Before", reserve1Before)
+
+
+                //approve tokens for swap
+                const balanceRandomBuyer = await TokenContract.balanceOf(randomBuyer.address)
+                const approval = await randomBuyerConnect.approve("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", balanceRandomBuyer)
+
+                await expect(UniswapV2Router.connect(randomBuyer).swapExactTokensForETHSupportingFeeOnTransferTokens(balanceRandomBuyer, 0, pathSell, randomBuyer.address, deadline)).to.not.be.reverted
+                
+                //get reserves after the sell
+                const reservesAfter = await Pair.getReserves()
+                const reserve0After = ethers.utils.formatEther(reservesAfter._reserve0.toString())
+                const reserve1After = ethers.utils.formatEther(reservesAfter._reserve1.toString())
+                console.log("reserve0After", reserve0After)
+                console.log("reserve1After", reserve1After)
+                
+                //console.log("tokenAddress",tokenAddress)
+                //console.log("pairAddress", pairAddress)
+                //console.log("amountTokensToLiq", ethers.utils.formatEther(amountTokensToLiq.toString()))
+                //console.log("amountETHToLiq", ethers.utils.formatUnits(amountETHToLiq.toString()))
+                //console.log("fetchedContractBalance", ethers.utils.formatUnits(fetchedContractBalance.toString()))
+                
+            }
+        })
+
+
         it("should calculate the keccak256 of the events correctly", async function () {
             const buyEventSignature = "Bought(address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint256)";
             const buyHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(buyEventSignature));

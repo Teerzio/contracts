@@ -28,7 +28,7 @@ const main = {
             UniswapV2Factory: '0xB7f907f7A9eBC822a80BD25E224be42Ce0A698A0',
             UniswapV2Router:'0x425141165d3DE9FEC831896C016617a52363b687'
         },*/
-        bnb_testnet_kek:{
+        bnb_testnet_kek_old:{
             WETH_USDC_PAIR: "0xa8B8cb1C5c9e13C3af86cc8aa5f0297Db69b099C",
             SushiSwapV2Factory: "0xc35DADB65012eC5796536bD9864eD8773aBc74C4",
             SushiSwapV2Router: "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506",
@@ -36,6 +36,10 @@ const main = {
             eventHandler:'0xAF3B1FF5C33C9D144300f7Eb9EFD9a044fF5Acb2',
             deployedToken:"0x36e8e95e465eda43e21185e77e91981971645079"
 
+        },
+        bnb_testnet_kek_new: {
+            factory: "0x42d350729a67791Cf18e3C55F1df153C18e09183",
+            eventhandler: "0xAAC562D8B30630fc48247767858f20D34bc1082e"
         },
         bnb_testnet_based:{
             factory: "0xA5D9059A277F599857e41bd34C5FF332Dabd1970",
@@ -65,8 +69,8 @@ const main = {
                 console.log("event handler address", eventHandler.address)
 
                 await factory.setEventHandler(eventHandler.address, {gasLimit: 3000000, gasPrice: ethers.utils.parseUnits('20', 'gwei')})
-                await factory.setA(a, {gasLimit: 3000000, gasPrice: ethers.utils.parseUnits('20', 'gwei')})
-                await factory.setB(b, {gasLimit: 3000000, gasPrice: ethers.utils.parseUnits('20', 'gwei')})
+                await factory.setFix(a, {gasLimit: 3000000, gasPrice: ethers.utils.parseUnits('20', 'gwei')})
+                await factory.setMultiplicator(b, {gasLimit: 3000000, gasPrice: ethers.utils.parseUnits('20', 'gwei')})
             }
             catch (error){
                 console.log("error", error)
@@ -75,19 +79,19 @@ const main = {
     launch:
         async () => {
             try{
-                const params = ["0xAF3B1FF5C33C9D144300f7Eb9EFD9a044fF5Acb2", "0xc35DADB65012eC5796536bD9864eD8773aBc74C4", "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506"]
+                const params = ["0xAAC562D8B30630fc48247767858f20D34bc1082e", "0xc35DADB65012eC5796536bD9864eD8773aBc74C4", "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506", "0x42d350729a67791Cf18e3C55F1df153C18e09183"]
                 const a = ethers.utils.parseUnits("0.000001", "ether"); // This equals 10 ** 17 wei
                 const b = ethers.utils.parseUnits("0.0000005", "ether"); // This equals 10 ** 17 wei
                 const initialFee = ethers.utils.parseUnits("0.002", "ether")
 
                 const privateKey = process.env.PRIVATE_KEY;
                 const wallet = new ethers.Wallet(privateKey, ethers.provider);
-                const buyAmount = ethers.utils.parseEther("0.0001")
+                const buyAmount = ethers.utils.parseEther("0.001")
                 const value = initialFee.add(buyAmount).add((buyAmount.mul(5).div(1000)))
             
                 console.log("wallet creating new Token", wallet.address);
 
-                Factory = await ethers.getContractAt("Factory", "0xA9B3b651bc5FfE3a9783541ED16E70430958B470");
+                Factory = await ethers.getContractAt("Factory", "0x42d350729a67791Cf18e3C55F1df153C18e09183");
                 const caller = Factory.connect(wallet)
 
                 //const response = await caller.setActive({gasLimit: 3000000, gasPrice: ethers.utils.parseUnits('20', 'gwei')})
@@ -133,7 +137,7 @@ const main = {
         async () => {
             const privateKey = process.env.PRIVATE_KEY;
             const wallet = new ethers.Wallet(privateKey, ethers.provider); 
-            FactoryContract = await ethers.getContractAt("Factory", "0xA5D9059A277F599857e41bd34C5FF332Dabd1970")
+            FactoryContract = await ethers.getContractAt("Factory", "0x42d350729a67791Cf18e3C55F1df153C18e09183")
             const caller = FactoryContract.connect(wallet)
             const response = await caller.setActive({gasLimit: 300000, gasPrice: ethers.utils.parseUnits('300', 'gwei')})
             console.log("activate response", response)
@@ -172,9 +176,9 @@ const main = {
     process.exit(1);
 });*/
 
-main.activate()
+/*main.activate()
 .then(() => process.exit(0))
 .catch(error => {
     console.error(error);
     process.exit(1);
-});
+});*/
