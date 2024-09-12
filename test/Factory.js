@@ -79,7 +79,7 @@ const {
         const txValue = buyAmount.add(initialFee)
         const txResponse = await tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", factoryOwner.address, 0, {value: txValue});
         const receipt = await txResponse.wait();
-        expect(txResponse).to.not.be.reverted
+        await expect(txResponse).to.not.be.reverted
 
         // make test fail if the creation event was not emitted
         const eventFilter = eventHandler.filters.Created();
@@ -96,7 +96,7 @@ const {
         const receipt = await response.wait();
 
         // expect the xreation to succeed
-        expect(response).to.not.be.reverted
+       await expect(response).to.not.be.reverted
 
         // check if event was emitted
         const eventFilter = eventHandler.filters.Created();
@@ -171,6 +171,38 @@ const {
       it("should revert if the eventhandler is not a contract", async function(){
         const { factoryOwner, factory, tokenCreator, tokenCreatorConnect, ownerConnect, eventHandler, initialFee } = await loadFixture(fixture);
         await expect(ownerConnect.setEventHandler(factoryOwner.address)).to.be.revertedWith("eventHandler must be a contract")
+      })
+      it("should revert if _fix or _multiplicator is set to zero", async function(){
+        const initialFee = ethers.utils.parseUnits("0.1", "ether"); // This equals 10 ** 17 wei
+        //const a = ethers.utils.parseUnits("0.00001", "ether"); // This equals 10 ** 17 wei
+        const b = ethers.utils.parseUnits("0.000001", "ether"); // This equals 10 ** 17 wei
+        const [factoryOwner, tokenCreator] = await ethers.getSigners();
+  
+        // deploy factory
+        const Factory = await ethers.getContractFactory("Factory");
+        const factory = await Factory.deploy(initialFee);
+        const ownerConnect = factory.connect(factoryOwner);
+        const tokenCreatorConnect = factory.connect(tokenCreator);
+  
+        // deploy eventhandler
+        const EventHandler = await ethers.getContractFactory("EventHandler");
+        const eventHandler = await EventHandler.deploy(factory.address);
+        const setEventHandler = await factory.setEventHandler(eventHandler.address);
+        console.log("EventHandler Address:", eventHandler.address);
+
+        const active = await ownerConnect.setActive();
+        const params = [eventHandler.address, "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f", "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D", factory.address]
+       
+        //checking if fix and multiplicator are actually 0
+        const multiplicator = await ownerConnect._multiplicator()
+        const fix = await ownerConnect._fix()
+        expect(multiplicator).to.equal(0)
+        expect(fix).to.equal(0)
+
+        //create a new token
+        const buyAmount = ethers.utils.parseUnits("0.1", "ether"); // This equals 10 ** 17 wei
+        const txValue = buyAmount.add(initialFee)
+        await expect(tokenCreatorConnect.deployNewToken(params, "Token", "TKN", "description", factoryOwner.address, 0, {value: txValue})).to.be.revertedWithCustomError
       })
     }) 
   })

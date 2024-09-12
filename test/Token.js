@@ -323,8 +323,8 @@ const {
                 Pair = await ethers.getContractAt("UniswapV2Pair", pair);
                 const reserves = await Pair.getReserves()
 
-                expect(reserves._reserve0).to.equal(amountTokensToLiq)
-                expect(reserves._reserve1).to.equal(amountETHToLiq)
+                expect(reserves._reserve0).to.equal(amountETHToLiq)
+                expect(reserves._reserve1).to.equal(amountTokensToLiq)
 
                 /*
                 console.log("tokenAddress",tokenAddress)
@@ -618,7 +618,6 @@ const {
                 
             }
         })
-
 
         it("should calculate the keccak256 of the events correctly", async function () {
             const buyEventSignature = "Bought(address,address,uint256,uint256,uint256,uint256,uint256,uint256,uint256)";

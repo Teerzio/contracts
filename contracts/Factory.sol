@@ -34,6 +34,7 @@ contract Factory {
     event UpdateFix(uint256 newFix, uint256 timestamp);
     event UpdateMultiplicator(uint256 newMultiplicator, uint256 timestamp);
     event UpdateActive(bool active, uint256 timestamp);
+    
 
 
 
@@ -43,6 +44,7 @@ contract Factory {
     }
 
     error InsufficientFunds(address sender, uint256 balance, uint256 needed);
+    error InvalidParameterValue(uint256 fix_, uint256 multiplicator_);
 
     /**
         * @dev
@@ -57,6 +59,7 @@ contract Factory {
         if(!active) {revert ("contract is not active yet");}
         if(fee > msg.value) {revert InsufficientFunds(msg.sender, msg.sender.balance, fee);}
         if(fee > msg.sender.balance) {revert InsufficientFunds(msg.sender, msg.sender.balance, fee);}
+        if(_fix == 0 || _multiplicator == 0) {revert InvalidParameterValue(_fix, _multiplicator);}
 
         //effects
         token = address (new Token(
